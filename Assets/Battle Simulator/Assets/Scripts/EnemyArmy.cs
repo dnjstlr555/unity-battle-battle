@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class EnemyArmy : MonoBehaviour {
 	
+	public bool IsEnemyAllPlaced = false;
 	//not visible in the inspector
 	private LevelData levelData;
 	private List<GameObject> spawnedEnemies = new List<GameObject>();
@@ -19,10 +20,10 @@ public class EnemyArmy : MonoBehaviour {
 		
 		//spawn enemies if this level exists
 		if(level < levelData.levels.Count)
-			StartCoroutine(spawnEnemies(level));
+			spawnEnemies(level);
 	}
 	
-	IEnumerator spawnEnemies(int levelIndex){
+	void spawnEnemies(int levelIndex){
 		//get the gridsize and the space in between grid cells
 		int levelGridSize = levelData.levels[levelIndex].gridSize;
 		int sizeGrid = 2;
@@ -41,15 +42,18 @@ public class EnemyArmy : MonoBehaviour {
 				if(unit != null){
 					//if there is a unit/character, spawn it and wait a moment for the spawn effect
 					spawnNew(position, unit);
-					yield return new WaitForSeconds(levelData.spawnDelay);
+					//yield return new WaitForSeconds(levelData.spawnDelay);
 				}
 				
 				//increase the current position index
 				currentPosition++;
 			}
 		}
+		IsEnemyAllPlaced=true;
 	}
-	
+	public bool IsPlaced() {
+		return IsEnemyAllPlaced;
+	}
 	//spawn a new enemy
 	public void spawnNew(Vector3 position, GameObject unit){
 		//store the raycast hit

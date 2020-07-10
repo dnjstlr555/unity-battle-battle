@@ -1,11 +1,11 @@
-﻿using UnityEngine;
-using System.Collections;
+﻿using System.Collections;
+using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.UI; 
 using UnityEngine.AI;
 using System.Linq;
 
-public class Unit : MonoBehaviour {
+public class RigidUnit : MonoBehaviour {
 	
 	//variables visible in the inspector
 	public float lives;
@@ -29,6 +29,7 @@ public class Unit : MonoBehaviour {
 	[HideInInspector]
 	private float startLives;
 	private float defaultStoppingDistance;
+	public Rigidbody Rigid;
 	private Animator animator;
 	private AudioSource source;
 	
@@ -42,6 +43,7 @@ public class Unit : MonoBehaviour {
 	
 	void Start(){
 		//if this an archer or enemy, don't use the spread option
+		print("lol");
 		if(GetComponent<Archer>() || this.tag == "Enemy")
 			spread = false; //spread the alley
 		
@@ -52,7 +54,9 @@ public class Unit : MonoBehaviour {
 		//find navmesh agent component
 		agent = this.GetComponent<NavMeshAgent>();
 		animator = this.GetComponent<Animator>();
-	
+		print(agent);
+		Rigid = this.GetComponent<Rigidbody>();
+
 		//find objects attached to this character
 		health = transform.Find("Health").gameObject;
 		healthbar = health.transform.Find("Healthbar").gameObject;
@@ -67,6 +71,7 @@ public class Unit : MonoBehaviour {
 		//if there's a dust effect, find and assign it
 		if(transform.Find("dust"))
 			dustEffect = transform.Find("dust").gameObject.GetComponent<ParticleSystem>();
+			print("dustdddd");
 		
 		//find the area so the character can walk around
 		area = GameObject.FindObjectOfType<WalkArea>();
@@ -111,7 +116,9 @@ public class Unit : MonoBehaviour {
 			//move the agent around and set its destination to the enemy target
 			agent.isStopped = false;	
 			agent.destination = currentTarget.position;	
-		
+			//Vector3 dir = (transform.position - currentTarget.position).normalized;
+			//Rigid.MovePosition(dir);
+			
 			//check if character has reached its target and than rotate towards target and attack it
 			if(Vector3.Distance(currentTarget.position, transform.position) <= agent.stoppingDistance){
 				Vector3 currentTargetPosition = currentTarget.position;
@@ -125,14 +132,8 @@ public class Unit : MonoBehaviour {
 					source.Play();
 				}
 				
-				if(currentTarget.gameObject.GetComponent<AgentScript>()) {
-					currentTarget.gameObject.GetComponent<AgentScript>().lives -= Time.deltaTime * damage;
-				} else if(currentTarget.gameObject.GetComponent<Unit>()) {
-					currentTarget.gameObject.GetComponent<Unit>().lives -= Time.deltaTime * damage;
-				} else {
-					
-				}
 				//apply damage to the enemy
+				currentTarget.gameObject.GetComponent<Unit>().lives -= Time.deltaTime * damage;
 			}
 				
 			//if its still traveling to the target, play running animation

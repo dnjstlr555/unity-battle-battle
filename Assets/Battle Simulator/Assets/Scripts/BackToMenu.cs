@@ -15,9 +15,9 @@ public class BackToMenu : MonoBehaviour {
 	
 	IEnumerator goBack(){
 		//wait for the transition and load the very first scene
-		transition.SetTrigger("fade");
+		//transition.SetTrigger("fade");
 		
-		yield return new WaitForSeconds(0.5f);
+		yield return new WaitForSeconds(0);
 		
 		SceneManager.LoadScene(0);
 	}

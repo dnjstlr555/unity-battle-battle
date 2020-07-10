@@ -145,9 +145,9 @@ public class Menu : MonoBehaviour {
 	
 	IEnumerator level(int index){
 		//wait for the fade animation to end
-		transition.SetTrigger("fade");
+		//transition.SetTrigger("fade");
 		
-		yield return new WaitForSeconds(0.5f);
+		yield return new WaitForSeconds(0);
 		
 		//save the new level index and load it
 		PlayerPrefs.SetInt("level", index);

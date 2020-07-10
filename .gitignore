@@ -9,7 +9,7 @@
 /[Bb]uilds/
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
-
+/configs/
 # MemoryCaptures can get excessive in size.
 # They also could contain extremely sensitive data
 /[Mm]emoryCaptures/
@@ -100,3 +100,4 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+Assets/.DS_Store

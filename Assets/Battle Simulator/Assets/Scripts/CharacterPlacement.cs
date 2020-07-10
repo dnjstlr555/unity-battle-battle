@@ -82,12 +82,13 @@ public class CharacterPlacement : MonoBehaviour {
 	
 	private bool mobile;
 	private int gridSize;
-	
+	private bool EpisodeEnded=false;
+	private bool IsEditingMode=false;
 	void Awake(){
 		//get the level data object and check if we're using mobile controls
 		levelData = Resources.Load("Level data") as LevelData;
 		mobile = (GameObject.FindObjectOfType<CamJoystick>() != null);
-		
+		EpisodeEnded=false;
 		if(mobile){
 			//if the game has mobile controls, enable the grid, update the button text and don't show the erase button since it doesn't work with the 2D grid
 			levelData.grid = true;
@@ -215,21 +216,37 @@ public class CharacterPlacement : MonoBehaviour {
 	void Start(){
 		//get the erase button color and store it
 		eraseStartColor = eraseButton.color;
-		
-		//show the character buttons in the left panel
-		StartCoroutine(addCharacterButtons());
-		
-		//get the coins for this level and show them
-		coins = levelData.levels[PlayerPrefs.GetInt("level")].playerCoins;
-		coinsText.text = coins + "";
-		
-		//initialize some boolean values
 		characterStats = true;
 		switchPanelContent(false);
 		
 		characterStatsPanel.SetActive(false);
 		topDownMapPanel.SetActive(true);
-		setStats(0);
+		if(IsEditingMode) {
+			//show the character buttons in the left panel
+			StartCoroutine(addCharacterButtons());
+			
+			//get the coins for this level and show them
+			//coins = levelData.levels[PlayerPrefs.GetInt("level")].playerCoins;
+			//coinsText.text = coins + "";
+			
+			//initialize some boolean values
+			
+			//setStats(0);
+			selected=4;
+			/*
+			placeUnit(new Vector3(3.2f,0,-9.7f), false);
+			placeUnit(new Vector3(3.0f,0.0f,2.9f), false);
+			startBattle();
+			*/
+		} else {
+			//placeholder
+			//instant transition will be.
+			leftPanelAnimator.SetBool("hide instant", true);
+			selected=4;
+			placeUnit(new Vector3(3.2f,0,-9.7f), false);
+			placeUnit(new Vector3(3.0f,0.0f,2.9f), false);
+			startBattle();
+		}
 	}
 	
 	void Update(){
@@ -237,15 +254,18 @@ public class CharacterPlacement : MonoBehaviour {
 		if(battleStarted){
 			//check if the enemies or allies are all dead and if that's the case, end the game
 			if(GameObject.FindGameObjectsWithTag("Knight").Length == 0){
-				endPanel.SetTrigger("defeat");
-				
+				if(IsEditingMode) {
+					endPanel.SetTrigger("defeat");
+				}
 				endGame();
 			}
 			else if(GameObject.FindGameObjectsWithTag("Enemy").Length == 0){
-				endPanel.SetTrigger("victory");
+				if(IsEditingMode) {
+					endPanel.SetTrigger("victory");
+					
+				}
 				//PlayerPrefs.SetInt("level" + (PlayerPrefs.GetInt("level") + 1), 1); //won flag for each levels
 				PlayerPrefs.SetInt("level", PlayerPrefs.GetInt("level") + 1); //next level
-				
 				endGame();
 			}
 			
@@ -273,18 +293,19 @@ public class CharacterPlacement : MonoBehaviour {
 			battleIndicator.fillAmount += Time.deltaTime * 0.5f;
 		}
 		
-		//don't update the preview character on mobile devices since it uses the 2d grid
-		if(mobile)
-			return;
-		
+		//don't update the preview character on mobile devices since it uses the 2d grid	
 		//remove the demo character when hiding the left character panel
-		if(leftPanelAnimator.gameObject.activeSelf && leftPanelAnimator.GetBool("hide panel")){
+		//clear: mobile, battleStarted, activeSelf	
+		if(mobile || battleStarted || !leftPanelAnimator.gameObject.activeSelf){
 			if(currentDemoCharacter)
 				Destroy(currentDemoCharacter);
-			
 			//return so it will not use the demo
 			return;
 		}
+		if(leftPanelAnimator.GetBool("hide panel")) {
+			//placeholder
+		}
+		
 		
 		//check for the x key to erase characters
 		if((Input.GetKeyDown("x") && !erasing) || (Input.GetKeyUp("x") && erasingUsingKey)){
@@ -309,12 +330,13 @@ public class CharacterPlacement : MonoBehaviour {
 				}
 				
 				//place a unit when the left mouse button is down
-				if(Input.GetMouseButton(0) && position.x > 0)
+				if(Input.GetMouseButton(0) && position.x > 0) {
 					placeUnit(position, false);
-				
+					print(position);
+				}
 				//get a color for the demo character and change it based on the validity of the current mouse position
 				Color color = Color.white;
-				if(unitsInRange(position) != null || position.x < 0 || troops[selected].troopCosts > coins || Vector3.Distance(Camera.main.transform.position, position) > levelData.placeRange || !withinGrid(position)){
+				if(unitsInRange(position) != null || position.x < 0 || Vector3.Distance(Camera.main.transform.position, position) > levelData.placeRange || !withinGrid(position)){ //|| troops[selected].troopCosts > coins
 					color = levelData.invalidPosition;
 				}
 				else{
@@ -412,7 +434,7 @@ public class CharacterPlacement : MonoBehaviour {
 	//check if the character can be placed at this position
 	bool canPlace(Vector3 position, bool placingGridCell){
 		//check if there's units too close to the current position
-		if(unitsInRange(position) != null || troops[selected].troopCosts > coins || !withinGrid(position))
+		if(unitsInRange(position) != null || !withinGrid(position)) //troops[selected].troopCosts > coins ||
 			return false;
 		
 		//check if we're within the maximum place range
@@ -448,7 +470,6 @@ public class CharacterPlacement : MonoBehaviour {
 	public void gridClick(int clickedIndex, GameObject cell){
 		//get the 3d position of this click
 		Vector3 position = gridIndexToPosition(clickedIndex);
-		
 		//if there's a unit already, remove it. Else, add a new one
 		if(cell.transform.GetChild(0).gameObject.activeSelf){
 			eraseUnit(position, false, true);
@@ -560,6 +581,7 @@ public class CharacterPlacement : MonoBehaviour {
 	}
 	
 	public void selectTroop(int index){
+		print(index);
 		//remove all outlines and set the current button outline visible
 		for(int i = 0; i < troops.Count; i++){
 			troops[i].button.GetComponent<Outline>().enabled = false;	
@@ -687,24 +709,28 @@ public class CharacterPlacement : MonoBehaviour {
 	public void disableUnit(GameObject unit){
 		//disable the navmesh agent component
 		unit.GetComponent<NavMeshAgent>().enabled = false;
-		
-		//disable the unit script
-		Unit unitScript = unit.GetComponent<Unit>();
-		unitScript.spread = levelData.spreadUnits;
-		unitScript.enabled = false;
-		
-		//disable the collider
 		unit.GetComponent<Collider>().enabled = false;
-		
+
 		//if this is an archer, disable the archer functionality
+		if(unit.GetComponent<Unit>()) {
+			Unit unitScript = unit.GetComponent<Unit>();
+			unitScript.spread = levelData.spreadUnits;
+			unitScript.enabled = false;
+		}
 		if(unit.GetComponent<Archer>())
 			unit.GetComponent<Archer>().enabled = false;
-		/*foreach (MonoBehaviour script in unit.GetComponents<MonoBehaviour>()) {
-			if(script.type == "CustomBehaviour") {
+		if(unit.GetComponent<AgentScript>()) {
+			unit.GetComponent<AgentScript>().spread = levelData.spreadUnits;
+			unit.GetComponent<AgentScript>().enabled = false;
+		}
+		/*
+		foreach (MonoBehaviour component in unit.GetComponents<MonoBehaviour>()) {
+			if(component.type == "CustomBehaviour") {
 				print("haha");
 				this.enabled = false;
 			}
-		}*/
+		}
+		*/
 		//disable the health object
 		unit.transform.Find("Health").gameObject.SetActive(false);	
 		
@@ -722,22 +748,19 @@ public class CharacterPlacement : MonoBehaviour {
 	public void enableUnit(GameObject unit){
 		//enable all the components
 		unit.GetComponent<NavMeshAgent>().enabled = true;
-		unit.GetComponent<Unit>().enabled = true;
 		unit.GetComponent<Collider>().enabled = true;
 		unit.GetComponent<AudioSource>().Play();
-		
+		//nit.GetComponent<Rigidbody>().isKinematic = false;
 		//enable the archer
+		if(unit.GetComponent<Unit>()) {
+			Unit unitScript = unit.GetComponent<Unit>();
+			unitScript.enabled = true;
+		}
 		if(unit.GetComponent<Archer>())
 			unit.GetComponent<Archer>().enabled = true;
-		/*
-		foreach(MonoBehaviour script in unit.GetComponents(MonoBehaviour)) {
-			if(script.type == "CustomBehaviour") {
-				this.enabled = true;
-			}
-		}*/
-		//if(unit.GetComponent<Healer>())
-			//unit.GetComponent<Healer>().enabled = true;
-		//show the healthbar
+		if(unit.GetComponent<AgentScript>()) {
+			unit.GetComponent<AgentScript>().enabled = true;
+		}
 		unit.transform.Find("Health").gameObject.SetActive(true);	
 		
 		//show particles
@@ -763,9 +786,9 @@ public class CharacterPlacement : MonoBehaviour {
 	
 	IEnumerator openLevel(){
 		//wait for the fade transition to end
-		transition.SetTrigger("fade");
+		//transition.SetTrigger("fade");
 		
-		yield return new WaitForSeconds(0.5f);
+		yield return new WaitForSeconds(0);
 		
 		//check if the next level exist and load it if it does
 		if(PlayerPrefs.GetInt("level") < levelData.levels.Count){
@@ -825,10 +848,12 @@ public class CharacterPlacement : MonoBehaviour {
 		foreach(GameObject ally in placedUnits){
 			enableUnit(ally);
 		}
-		
-		//start all enemies as well
-		FindObjectOfType<EnemyArmy>().startEnemies();
-		
+		if(FindObjectOfType<EnemyArmy>().IsPlaced()) {
+			FindObjectOfType<EnemyArmy>().startEnemies();
+		} else {
+			print("Coudln't start battle beacuse the enemy didn't spawn");
+			return;
+		}
 		//show the new UI
 		StartCoroutine(battleUI());
 		battleStarted = true;
@@ -842,6 +867,14 @@ public class CharacterPlacement : MonoBehaviour {
 		//end the battle
 		battleStarted = false;
 		gamePanel.SetBool("show", false);
+		//do something
+		if(!IsEditingMode) {
+			foreach(AgentScript Agent in GetComponents<AgentScript>()) {
+				Agent.EndEpisode();
+			}
+			EpisodeEnded=true;
+			nextLevel();
+		}
 	}
 	
 	public void setSpeed(){
@@ -882,18 +915,27 @@ public class CharacterPlacement : MonoBehaviour {
 	
 	IEnumerator battleUI(){
 		//hide the character panel
+		/*
 		if(!leftPanelAnimator.GetBool("hide panel"))
-			leftPanelAnimator.SetBool("hide panel", true);
-		
+			if(!leftPanelAnimator.GetBool("hide instant") && !IsEditingMode)
+				leftPanelAnimator.SetBool("hide instant", true);
+			else
+				leftPanelAnimator.SetBool("hide panel", true);
+		*/
 		//hide the grid
 		grid.SetBool("show", false);
-		
+		leftPanelAnimator.gameObject.SetActive(false);
+		if(IsEditingMode) {
+			buttonsAnimator.SetBool("hide", true);
+		} else {
+			buttonsAnimator.gameObject.SetActive(false);
+			foreach(GameObject UI in GameObject.FindGameObjectsWithTag("Editory")) {
+				UI.SetActive(false);
+			}
+		}
+
 		//wait a moment and remove the panels
 		yield return new WaitForSeconds(0.5f);
-		
-		leftPanelAnimator.gameObject.SetActive(false);
-		buttonsAnimator.SetBool("hide", true);
-		
 		//show the game panel
 		gamePanel.SetBool("show", true);
 	}

@@ -38,13 +38,15 @@ public class Unit : MonoBehaviour {
 	private ParticleSystem dustEffect;
 	private int maxAlliesPerEnemy;
 	
-	private bool dead;
+	private GameSystem Academy;
+	public bool dead;
 	
 	void Start(){
 		//if this an archer or enemy, don't use the spread option
 		if(GetComponent<Archer>() || this.tag == "Enemy")
 			spread = false; //spread the alley
-		
+		Academy = GameObject.FindObjectOfType<GameSystem>();
+		//print(Academy);
 		//get the audio source
 		source = GetComponent<AudioSource>();
 		maxAlliesPerEnemy = 1;
@@ -84,11 +86,12 @@ public class Unit : MonoBehaviour {
 		
 		//find closest enemy
 		//ML:relating to moves
-		if(currentTarget == null && GameObject.FindGameObjectsWithTag(attackTag).Length > 0)
+		
+		if(currentTarget == null && Academy.knightNumber>0)
 			currentTarget = findCurrentTarget();	
 		
 		//if character ran out of lives, it should die
-		if(lives < 1 && !dead)
+		if(lives < 0 && !dead)
 			StartCoroutine(die());
 		
 		//play dusteffect when running and stop it when the character is not running
@@ -100,7 +103,8 @@ public class Unit : MonoBehaviour {
 		
 		//randomly walk across the battlefield if there's no targets left
 		//ML:relating to moves
-		if(currentTarget == null){
+		if(currentTarget == null || currentTarget.GetComponent<AgentScript>().dead){
+			currentTarget = null;
 			walkRandomly();
 		}
 		else{
@@ -201,7 +205,7 @@ public class Unit : MonoBehaviour {
 		
 					foreach(GameObject potentialTarget in availableEnemies){
 						//check if there are enemies left to attack and check per enemy if its closest to this character
-						if(Vector3.Distance(transform.position, potentialTarget.transform.position) < closestDistance && potentialTarget != null){
+						if(Vector3.Distance(transform.position, potentialTarget.transform.position) < closestDistance && potentialTarget != null && !target.GetComponent<AgentScript>().dead){
 							//if this enemy is closest to character, set closest distance to distance between character and enemy
 							closestDistance = Vector3.Distance(transform.position, potentialTarget.transform.position);
 							target = potentialTarget.transform;
@@ -209,7 +213,7 @@ public class Unit : MonoBehaviour {
 					}	
 					
 					//if it is valid, return this target
-					if(target && canAttack(target)){
+					if(target && canAttack(target) && !target.GetComponent<AgentScript>().dead){
 						return target;
 					}
 					else{
@@ -263,7 +267,7 @@ public class Unit : MonoBehaviour {
 		}
 		
 		//check if we may attack this target
-		if(numberOfUnitsAttackingThisEnemy < maxAlliesPerEnemy)
+		if(numberOfUnitsAttackingThisEnemy < maxAlliesPerEnemy && !target.GetComponent<AgentScript>().dead)
 			return true;
 		
 		//return false if there's too much allies attacking this enemy already

@@ -17,7 +17,7 @@ public class Troop{
 	public GameObject button;
 }
 
-public class CharacterPlacement : MonoBehaviour {
+public class GameSystem : MonoBehaviour {
 	
 	//variables visible in the inspector
 	[Header("Objects:")]
@@ -63,7 +63,7 @@ public class CharacterPlacement : MonoBehaviour {
 	
 	[Header("Troops:")]
 	public List<Troop> troops;
-	
+	public int enemyNumber, knightNumber;
 	//not visible in the inspector
 	private int selected;
 	private GameObject currentDemoCharacter;
@@ -85,6 +85,8 @@ public class CharacterPlacement : MonoBehaviour {
 	private bool EpisodeEnded=false;
 	private bool IsEditingMode=false;
 	void Awake(){
+		knightNumber=0;
+		enemyNumber=0;
 		//get the level data object and check if we're using mobile controls
 		levelData = Resources.Load("Level data") as LevelData;
 		mobile = (GameObject.FindObjectOfType<CamJoystick>() != null);
@@ -248,24 +250,44 @@ public class CharacterPlacement : MonoBehaviour {
 			startBattle();
 		}
 	}
-	
+
 	void Update(){
 		//if the battle has started
 		if(battleStarted){
-			//check if the enemies or allies are all dead and if that's the case, end the game
-			if(GameObject.FindGameObjectsWithTag("Knight").Length == 0){
+			knightNumber=0;
+			enemyNumber=0;
+			foreach(GameObject Knight in GameObject.FindGameObjectsWithTag("Knight")) {
+				if(Knight.GetComponent<AgentScript>() != null && !Knight.GetComponent<AgentScript>().dead) {
+					knightNumber+=1;
+				} else if(Knight.GetComponent<Unit>() != null && !Knight.GetComponent<Unit>().dead) {
+					knightNumber+=1;
+				} else {
+					//What are you?
+				}
+			}
+			foreach(GameObject Enemy in GameObject.FindGameObjectsWithTag("Enemy")) {
+				if(Enemy.GetComponent<AgentScript>() != null && !Enemy.GetComponent<AgentScript>().dead) {
+					enemyNumber+=1;
+				} else if(Enemy.GetComponent<Unit>() != null && !Enemy.GetComponent<Unit>().dead) {
+					enemyNumber+=1;
+				} else {
+					//What are you?
+				}
+			}
+			
+			if(knightNumber <= 0){
 				if(IsEditingMode) {
 					endPanel.SetTrigger("defeat");
 				}
 				endGame();
 			}
-			else if(GameObject.FindGameObjectsWithTag("Enemy").Length == 0){
+			else if(enemyNumber <= 0){
 				if(IsEditingMode) {
 					endPanel.SetTrigger("victory");
 					
 				}
 				//PlayerPrefs.SetInt("level" + (PlayerPrefs.GetInt("level") + 1), 1); //won flag for each levels
-				PlayerPrefs.SetInt("level", PlayerPrefs.GetInt("level") + 1); //next level
+				//PlayerPrefs.SetInt("level", PlayerPrefs.GetInt("level") + 1); //next level
 				endGame();
 			}
 			
@@ -869,9 +891,10 @@ public class CharacterPlacement : MonoBehaviour {
 		gamePanel.SetBool("show", false);
 		//do something
 		if(!IsEditingMode) {
-			foreach(AgentScript Agent in GetComponents<AgentScript>()) {
+			/*foreach(AgentScript Agent in GetComponents<AgentScript>()) {
 				Agent.EndEpisode();
 			}
+			*/
 			EpisodeEnded=true;
 			nextLevel();
 		}

@@ -5,11 +5,11 @@ using UnityEngine;
 public class CharacterSelector : MonoBehaviour {
 	
 	//reference to the character placement script so it can select a troop on click
-	CharacterPlacement characterPlacer;
+	GameSystem characterPlacer;
 	
 	void Start () {
 		//find the character placement script
-		characterPlacer = GameObject.FindObjectOfType<CharacterPlacement>();
+		characterPlacer = GameObject.FindObjectOfType<GameSystem>();
 	}
 	
 	public void Select(){

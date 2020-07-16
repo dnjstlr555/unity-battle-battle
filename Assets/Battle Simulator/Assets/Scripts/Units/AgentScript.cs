@@ -39,11 +39,7 @@ public class AgentScript : Agent
 	private ParticleSystem dustEffect;
 	private int maxAlliesPerEnemy;
 	
-	private bool dead;
-    Rigidbody rBody;
-    void Start () {
-        rBody = GetComponent<Rigidbody>();
-    }
+	public bool dead;
 
     public Transform Target;
     public override void OnEpisodeBegin() {
@@ -82,25 +78,46 @@ public class AgentScript : Agent
     }
     public override void CollectObservations(VectorSensor sensor)
     {
-        //space size:6
-        if(currentTarget == null && GameObject.FindGameObjectsWithTag(attackTag).Length > 0) currentTarget = findCurrentTarget();
-        // Target and Agent positions
-        sensor.AddObservation((currentTarget.position!=null)?currentTarget.position:Vector3.zero);
-        sensor.AddObservation(this.transform.localPosition);
-
-        // Agent velocity
-        /*
-        sensor.AddObservation(rBody.velocity.x);
-        sensor.AddObservation(rBody.velocity.z);
-        */
+        sensor.AddObservation(transform.localPosition.x);
+		sensor.AddObservation(transform.localPosition.z);
+		foreach(GameObject Knight in GameObject.FindGameObjectsWithTag("Knight")) {
+			if(Knight==this.gameObject) {
+				continue;
+			}
+			if((Knight.GetComponent<AgentScript>() != null && !Knight.GetComponent<AgentScript>().dead) || (Knight.GetComponent<Unit>() != null && !Knight.GetComponent<Unit>().dead)) {
+				sensor.AddObservation(Knight.transform.localPosition.x);
+				sensor.AddObservation(Knight.transform.localPosition.z);
+			} else {
+				sensor.AddObservation(-999999);
+				sensor.AddObservation(-999999);
+			}
+		}
+		foreach(GameObject Enemy in GameObject.FindGameObjectsWithTag("Enemy")) {
+			if(Enemy==this.gameObject) continue;
+			if((Enemy.GetComponent<AgentScript>() != null && !Enemy.GetComponent<AgentScript>().dead) || (Enemy.GetComponent<Unit>() != null && !Enemy.GetComponent<Unit>().dead)) {
+				sensor.AddObservation(Enemy.transform.localPosition.x);
+				sensor.AddObservation(Enemy.transform.localPosition.z);
+			} else {
+				sensor.AddObservation(-999999);
+				sensor.AddObservation(-999999);
+			}
+		}
     }
-    public float speed = 10;
-    public override void OnActionReceived(float[] vectorAction)
+	public static Vector2 RadianToVector2(float radian) {
+		return new Vector2(Mathf.Cos(radian), Mathf.Sin(radian));
+	}
+  
+	public static Vector2 DegreeToVector2(float degree) {
+		return RadianToVector2(degree * Mathf.Deg2Rad);
+	}
+    public float vector_offset = 10;
+    public override void OnActionReceived(float[] act)
     {
-        // Actions, size = 2
+        float angle = Mathf.Clamp(act[0], 0, 1) * 360f;
+    	float force = Mathf.Clamp(act[1], 0, 1) * vector_offset;
         Vector3 controlSignal = Vector3.zero;
-        controlSignal.x = vectorAction[0];
-        controlSignal.z = vectorAction[1];
+        controlSignal = DegreeToVector2(angle)*force;
+		
 		if (!dead) {
 			if(lives != startLives){
 				//only use the healthbar when the character lost some lives
@@ -112,28 +129,20 @@ public class AgentScript : Agent
 			}
 		
 			//if character ran out of lives, it should die
-			if(lives < 0 && !dead)
+			if(lives < 0)
 				StartCoroutine(die());
 				//if()
-			
-			//play dusteffect when running and stop it when the character is not running
 			if(dustEffect && animator.GetBool("Attacking") == false && !dustEffect.isPlaying)
 				dustEffect.Play();
 
 			if(dustEffect && dustEffect.isPlaying && animator.GetBool("Attacking") == true)
 				dustEffect.Stop();
-			
-			//randomly walk across the battlefield if there's no targets left
-			//ML:relating to moves
-			//if there are targets, make sure to use the default stopping distance
 			if(agent.stoppingDistance != defaultStoppingDistance)
 				agent.stoppingDistance = defaultStoppingDistance;
 			
 			//move the agent around and set its destination to the enemy target
-			//agent.isStopped = false;	
-			//agent.destination = controlSignal;
-			//Vector3 dir = (transform.position - currentTarget.position).normalized;
-			//Rigid.MovePosition(dir);
+			agent.isStopped = false;	
+			agent.destination = transform.position + controlSignal;
 			
 			//check if character has reached its target and than rotate towards target and attack it
 			if(Vector3.Distance(controlSignal, transform.position) <= agent.stoppingDistance){
@@ -164,6 +173,7 @@ public class AgentScript : Agent
 					source.Play();
 				}
 			}
+			SetReward(0.01f);
 		/*
 			// Rewards
 			float distanceToTarget = Vector3.Distance(this.transform.localPosition, findCurrentTarget().localPosition);
@@ -176,15 +186,18 @@ public class AgentScript : Agent
 			}
 			// Fell off platform
 			*/
-		} //20200710 
+		} else {
+			agent.isStopped = true;
+			SetReward(-0.01f);
+		}
 			
     }
-	public IEnumerator die(){
+	public IEnumerator die() {
 		dead = true;
-		
+		SetReward(-1f);
 		//create the ragdoll at the current position
 		Instantiate(ragdoll, transform.position, transform.rotation);
-		
+		transform.position = new Vector3(999, 999, 999);
 		//wait a moment and destroy the original unit
 		yield return new WaitForEndOfFrame();
 	}
@@ -281,4 +294,5 @@ public class AgentScript : Agent
         actionsOut[0] = Input.GetAxis("Horizontal");
         actionsOut[1] = Input.GetAxis("Vertical");
     }
+	
 }

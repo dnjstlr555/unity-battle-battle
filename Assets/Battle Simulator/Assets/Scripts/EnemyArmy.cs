@@ -8,7 +8,7 @@ public class EnemyArmy : MonoBehaviour {
 	//not visible in the inspector
 	private LevelData levelData;
 	private List<GameObject> spawnedEnemies = new List<GameObject>();
-	private CharacterPlacement characterPlacement;
+	private GameSystem characterPlacement;
 	
 	void Start () {
 		//find the level data object and get the current level
@@ -16,7 +16,7 @@ public class EnemyArmy : MonoBehaviour {
 		int level = PlayerPrefs.GetInt("level");
 		
 		//also find the character placement script
-		characterPlacement = GameObject.FindObjectOfType<CharacterPlacement>();
+		characterPlacement = GameObject.FindObjectOfType<GameSystem>();
 		
 		//spawn enemies if this level exists
 		if(level < levelData.levels.Count)

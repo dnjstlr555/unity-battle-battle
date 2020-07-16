@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using System.Collections.Generic;
 using System.Collections;
 using UnityEngine.EventSystems;
 
@@ -15,8 +16,11 @@ public class CamController : MonoBehaviour {
 	
 	private float timescale;
 	
-	private CharacterPlacement characterPlacer;
- 
+	private GameSystem characterPlacer;
+	private int Sticky = 0;
+	private GameObject[] Knight;
+	private GameObject thatKnight;
+	List<int> AvailableStick = new List<int>();
     void Start(){
 		//get start rotation
 		Vector3 rot = transform.localRotation.eulerAngles;
@@ -24,7 +28,8 @@ public class CamController : MonoBehaviour {
 		rotationX = rot.x;
 		
 		//find the character placer
-		characterPlacer = GameObject.FindObjectOfType<CharacterPlacement>();
+		characterPlacer = GameObject.FindObjectOfType<GameSystem>();
+		
     }
 	
 	void Update(){
@@ -41,11 +46,13 @@ public class CamController : MonoBehaviour {
 		}
 		
 		//if key gets pressed move left/right
-		if(Input.GetKey("a")){
-		transform.Translate(Vector3.right * -movespeed * timescale);
+		if(Input.GetKeyDown("a")){
+		//transform.Translate(Vector3.right * -movespeed * timescale);
+		Sticky-=1;
 		}
-		if(Input.GetKey("d")){
-		transform.Translate(Vector3.right * movespeed * timescale);
+		if(Input.GetKeyDown("d")){
+		//transform.Translate(Vector3.right * movespeed * timescale);
+		Sticky+=1;
 		}
 	
 		//if key gets pressed move up/down
@@ -55,7 +62,6 @@ public class CamController : MonoBehaviour {
 		if(Input.GetKey("s")){
 		transform.Translate(Vector3.up * -movespeed * timescale);
 		}
-	
 		//if scrollwheel is down rotate camera
 		if(Input.GetMouseButton(2)){
 			float mouseX = Input.GetAxis("Mouse X");
@@ -65,6 +71,23 @@ public class CamController : MonoBehaviour {
 	
 		//move camera when you scroll
 		transform.Translate(new Vector3(0, 0, Input.GetAxis("Mouse ScrollWheel")) * zoomSpeed * timescale);
+		AvailableStick.Clear();
+		if(characterPlacer.knightNumber>=1) {
+			Knight=GameObject.FindGameObjectsWithTag("Knight");
+			for(int i=0;i<Knight.Length;i++) {
+				thatKnight=Knight[i];
+				if(thatKnight.GetComponent<AgentScript>() != null && !thatKnight.GetComponent<AgentScript>().dead) {
+					AvailableStick.Add(i);
+				} else if(thatKnight.GetComponent<Unit>() != null && !thatKnight.GetComponent<Unit>().dead) {
+					AvailableStick.Add(i);
+				} else {
+					continue;
+				}
+			}
+			if(Sticky<0) Sticky=AvailableStick.Count-1;
+			if(Sticky>AvailableStick.Count-1) Sticky=0;
+			transform.position = new Vector3(Knight[AvailableStick[Sticky]].transform.position.x,transform.position.y,Knight[AvailableStick[Sticky]].transform.position.z);
+		}
 	}	
 	
 	void rotateCamera(float mouseX, float mouseY){

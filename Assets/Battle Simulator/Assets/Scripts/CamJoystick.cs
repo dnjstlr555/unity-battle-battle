@@ -17,7 +17,7 @@ public class CamJoystick : MonoBehaviour, IDragHandler, IPointerUpHandler, IPoin
 	//not visible in the inspector
 	private Transform cameraController;
 	private Vector3 direction;
-	private CharacterPlacement characterPlacer;
+	private GameSystem characterPlacer;
 	
 	private float start;
 	private float startRotation;
@@ -29,7 +29,7 @@ public class CamJoystick : MonoBehaviour, IDragHandler, IPointerUpHandler, IPoin
 		//get the camera controller and character placer
 		cameraController = Camera.main.gameObject.transform.parent;
 		direction = Vector3.zero;
-		characterPlacer = GameObject.FindObjectOfType<CharacterPlacement>();
+		characterPlacer = GameObject.FindObjectOfType<GameSystem>();
 	}
 	
 	void Update(){

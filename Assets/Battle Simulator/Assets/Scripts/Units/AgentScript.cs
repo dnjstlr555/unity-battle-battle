@@ -6,6 +6,46 @@ using System.Collections;
 using UnityEngine.UI; 
 using UnityEngine.AI;
 using System.Linq;
+
+class UnitInspect {
+	public Unit unit;
+	public AgentScript AgentScript;
+	public int lives=0;
+	public bool dead;
+	public bool isScriptValid() {
+		return (AgentScript!=null || unit!=null)?true:false;
+	}
+	public float getLives() {
+		if(this.isScriptValid() && !this.getDeadOrAlive()) {
+			if(AgentScript && !unit) {
+				return AgentScript.lives;
+			} else if(unit && !AgentScript) {
+				return unit.lives;
+			}
+		}
+		return -1;
+	}
+	public void setLives(float hp) {
+		if(this.isScriptValid() && !this.getDeadOrAlive()) {
+			if(AgentScript && !unit) {
+				AgentScript.lives=hp;
+			} else if(unit && !AgentScript) {
+				unit.lives=hp;
+			}
+		}
+	}
+	public bool getDeadOrAlive() {
+		///Returns true when the unit is dead or valid, otherwise return false
+		if(this.isScriptValid()) {
+			if(AgentScript && !unit) {
+				return AgentScript.dead;
+			} else if(unit && !AgentScript) {
+				return unit.dead;
+			}
+		}
+		return true;
+	}
+}
 public class AgentScript : Agent
 {
     public float lives;
@@ -42,6 +82,7 @@ public class AgentScript : Agent
 	public bool dead;
 
     public Transform Target;
+	private float REWARD;
     public override void OnEpisodeBegin() {
 		//if()
 		print("NewEpisode");
@@ -88,8 +129,8 @@ public class AgentScript : Agent
 				sensor.AddObservation(Knight.transform.localPosition.x);
 				sensor.AddObservation(Knight.transform.localPosition.z);
 			} else {
-				sensor.AddObservation(-999999);
-				sensor.AddObservation(-999999);
+				sensor.AddObservation(-9999999);
+				sensor.AddObservation(-9999999);
 			}
 		}
 		foreach(GameObject Enemy in GameObject.FindGameObjectsWithTag("Enemy")) {
@@ -98,8 +139,8 @@ public class AgentScript : Agent
 				sensor.AddObservation(Enemy.transform.localPosition.x);
 				sensor.AddObservation(Enemy.transform.localPosition.z);
 			} else {
-				sensor.AddObservation(-999999);
-				sensor.AddObservation(-999999);
+				sensor.AddObservation(-9999999);
+				sensor.AddObservation(-9999999);
 			}
 		}
     }
@@ -113,6 +154,7 @@ public class AgentScript : Agent
     public float vector_offset = 10;
     public override void OnActionReceived(float[] act)
     {
+		REWARD=-0.01f;
         float angle = Mathf.Clamp(act[0], 0, 1) * 360f;
     	float force = Mathf.Clamp(act[1], 0, 1) * vector_offset;
         Vector3 controlSignal = Vector3.zero;
@@ -145,26 +187,42 @@ public class AgentScript : Agent
 			agent.destination = transform.position + controlSignal;
 			
 			//check if character has reached its target and than rotate towards target and attack it
-			if(Vector3.Distance(controlSignal, transform.position) <= agent.stoppingDistance){
-				/* 
-				Vector3 currentTargetPosition = currentTarget.position;
-				currentTargetPosition.y = transform.position.y;
-				transform.LookAt(currentTargetPosition);
-				animator.SetBool("Attacking", true);
-				
-				//play the attack audio
-				if(source.clip != attackAudio){
-					source.clip = attackAudio;
-					source.Play();
+			UnitInspect potentialEnemy = new UnitInspect();
+			float maxDistance=Mathf.Infinity;
+			bool attacking=false;
+			foreach(GameObject enemy in GameObject.FindGameObjectsWithTag("Enemy")) {
+				potentialEnemy.unit = (enemy.GetComponent<Unit>()!=null) ? enemy.GetComponent<Unit>() : null;
+				potentialEnemy.AgentScript = (enemy.GetComponent<AgentScript>()!=null) ? enemy.GetComponent<AgentScript>() : null;
+
+				if(!potentialEnemy.getDeadOrAlive()) {
+					float distanceToTarget = Vector3.Distance(this.transform.localPosition, enemy.transform.localPosition);
+					if(distanceToTarget<= agent.stoppingDistance) {
+						maxDistance=(distanceToTarget>maxDistance)?distanceToTarget:maxDistance;
+
+						Vector3 currentTargetPosition = enemy.transform.position;
+						currentTargetPosition.y = transform.position.y;
+						transform.LookAt(currentTargetPosition);
+						animator.SetBool("Attacking", true);
+						
+						//play the attack audio
+						if(source.clip != attackAudio){
+							source.clip = attackAudio;
+							source.Play();
+						}
+						
+						potentialEnemy.setLives(potentialEnemy.getLives()-Time.deltaTime * damage);
+						attacking=true;
+						if(potentialEnemy.getLives()<0) {
+							REWARD+=2;
+						} else {
+							REWARD+=1;
+						}
+					}
 				}
-				
-				//apply damage to the enemy
-				currentTarget.gameObject.GetComponent<Unit>().lives -= Time.deltaTime * damage;
-				*/ 
 			}
 				
 			//if its still traveling to the target, play running animation
-			if(animator.GetBool("Attacking") && Vector3.Distance(currentTarget.position, transform.position) > agent.stoppingDistance){
+			if(animator.GetBool("Attacking") && !attacking){
 				animator.SetBool("Attacking", false);
 				
 				//play the running audio
@@ -173,7 +231,7 @@ public class AgentScript : Agent
 					source.Play();
 				}
 			}
-			SetReward(0.01f);
+			SetReward(REWARD);
 		/*
 			// Rewards
 			float distanceToTarget = Vector3.Distance(this.transform.localPosition, findCurrentTarget().localPosition);
@@ -188,7 +246,7 @@ public class AgentScript : Agent
 			*/
 		} else {
 			agent.isStopped = true;
-			SetReward(-0.01f);
+			SetReward(-0.03f);
 		}
 			
     }

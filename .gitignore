@@ -101,3 +101,5 @@ Network Trash Folder
 Temporary Items
 .apdisk
 Assets/.DS_Store
+
+#find . -name .DS_Store -print0 | xargs -0 git rm -f --ignore-unmatch

@@ -17,6 +17,7 @@ public class Troop{
 	public GameObject button;
 }
 
+
 public class GameSystem : MonoBehaviour {
 	
 	//variables visible in the inspector
@@ -63,17 +64,17 @@ public class GameSystem : MonoBehaviour {
 	
 	[Header("Troops:")]
 	public List<Troop> troops;
-	public int enemyNumber, knightNumber;
+	public int enemyNumber, knightNumber, initEnemyNumber, initKnightNumber;
 	//not visible in the inspector
 	private int selected;
 	private GameObject currentDemoCharacter;
 	private int rotation = -90;
-	private List<GameObject> placedUnits = new List<GameObject>();
+	public List<GameObject> placedUnits = new List<GameObject>();
 	
 	private bool erasing;
 	private Color eraseStartColor;
 	private int coins;
-	private bool battleStarted;
+	public bool battleStarted;
 	private bool erasingUsingKey;
 	private LevelData levelData;
 	private bool characterStats;
@@ -867,6 +868,9 @@ public class GameSystem : MonoBehaviour {
 	
 	public void startBattle(){
 		//enable all units so they start fighting
+		initEnemyNumber=GameObject.FindGameObjectsWithTag("Enemy").Length;
+		initKnightNumber=GameObject.FindGameObjectsWithTag("Knight").Length;
+		print(initEnemyNumber+" "+initKnightNumber);
 		foreach(GameObject ally in placedUnits){
 			enableUnit(ally);
 		}

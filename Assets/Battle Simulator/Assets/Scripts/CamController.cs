@@ -86,7 +86,9 @@ public class CamController : MonoBehaviour {
 			}
 			if(Sticky<0) Sticky=AvailableStick.Count-1;
 			if(Sticky>AvailableStick.Count-1) Sticky=0;
-			transform.position = new Vector3(Knight[AvailableStick[Sticky]].transform.position.x,transform.position.y,Knight[AvailableStick[Sticky]].transform.position.z);
+			if(AvailableStick!=null) {
+				transform.position = new Vector3(Knight[AvailableStick[Sticky]].transform.position.x,transform.position.y,Knight[AvailableStick[Sticky]].transform.position.z);
+			}
 		}
 	}	
 	

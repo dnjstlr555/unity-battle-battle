@@ -8,39 +8,43 @@ using UnityEngine.AI;
 using System.Linq;
 
 class UnitInspect {
-	public Unit unit;
+	public Unit UnitScript;
 	public AgentScript AgentScript;
 	public int lives=0;
-	public bool dead;
 	public bool isScriptValid() {
-		return (AgentScript!=null || unit!=null)?true:false;
+		return (AgentScript!=null || UnitScript!=null);
+	}
+	public bool setScriptsFrom(GameObject obj) {
+		UnitScript = (obj.GetComponent<Unit>()!=null) ? obj.GetComponent<Unit>() : null;
+		AgentScript = (obj.GetComponent<AgentScript>()!=null) ? obj.GetComponent<AgentScript>() : null;
+		return isScriptValid();
 	}
 	public float getLives() {
-		if(this.isScriptValid() && !this.getDeadOrAlive()) {
-			if(AgentScript && !unit) {
+		if(this.isScriptValid() && !this.isDead()) {
+			if(AgentScript && !UnitScript) {
 				return AgentScript.lives;
-			} else if(unit && !AgentScript) {
-				return unit.lives;
+			} else if(UnitScript && !AgentScript) {
+				return UnitScript.lives;
 			}
 		}
 		return -1;
 	}
 	public void setLives(float hp) {
-		if(this.isScriptValid() && !this.getDeadOrAlive()) {
-			if(AgentScript && !unit) {
+		if(this.isScriptValid() && !this.isDead()) {
+			if(AgentScript && !UnitScript) {
 				AgentScript.lives=hp;
-			} else if(unit && !AgentScript) {
-				unit.lives=hp;
+			} else if(UnitScript && !AgentScript) {
+				UnitScript.lives=hp;
 			}
 		}
 	}
-	public bool getDeadOrAlive() {
+	public bool isDead() {
 		///Returns true when the unit is dead or valid, otherwise return false
 		if(this.isScriptValid()) {
-			if(AgentScript && !unit) {
+			if(AgentScript && !UnitScript) {
 				return AgentScript.dead;
-			} else if(unit && !AgentScript) {
-				return unit.dead;
+			} else if(UnitScript && !AgentScript) {
+				return UnitScript.dead;
 			}
 		}
 		return true;
@@ -83,6 +87,7 @@ public class AgentScript : Agent
 
     public Transform Target;
 	private float REWARD;
+	private GameSystem sys;
     public override void OnEpisodeBegin() {
 		//if()
 		print("NewEpisode");
@@ -119,28 +124,49 @@ public class AgentScript : Agent
     }
     public override void CollectObservations(VectorSensor sensor)
     {
-        sensor.AddObservation(transform.localPosition.x);
-		sensor.AddObservation(transform.localPosition.z);
-		foreach(GameObject Knight in GameObject.FindGameObjectsWithTag("Knight")) {
-			if(Knight==this.gameObject) {
-				continue;
-			}
-			if((Knight.GetComponent<AgentScript>() != null && !Knight.GetComponent<AgentScript>().dead) || (Knight.GetComponent<Unit>() != null && !Knight.GetComponent<Unit>().dead)) {
-				sensor.AddObservation(Knight.transform.localPosition.x);
-				sensor.AddObservation(Knight.transform.localPosition.z);
+		sys = GameObject.FindObjectOfType<GameSystem>();
+		if(sys!=null) {
+			if(!sys.battleStarted) {
+				for(int i=0;i<sys.placedUnits.Count;i++) {
+					sensor.AddObservation(0);
+				}
 			} else {
-				sensor.AddObservation(-9999999);
-				sensor.AddObservation(-9999999);
-			}
-		}
-		foreach(GameObject Enemy in GameObject.FindGameObjectsWithTag("Enemy")) {
-			if(Enemy==this.gameObject) continue;
-			if((Enemy.GetComponent<AgentScript>() != null && !Enemy.GetComponent<AgentScript>().dead) || (Enemy.GetComponent<Unit>() != null && !Enemy.GetComponent<Unit>().dead)) {
-				sensor.AddObservation(Enemy.transform.localPosition.x);
-				sensor.AddObservation(Enemy.transform.localPosition.z);
-			} else {
-				sensor.AddObservation(-9999999);
-				sensor.AddObservation(-9999999);
+				UnitInspect inspector = new UnitInspect();
+				sensor.AddObservation(transform.localPosition.x);
+				sensor.AddObservation(transform.localPosition.z);
+				GameObject[] Knight = GameObject.FindGameObjectsWithTag("Knight");
+				GameObject[] Enemy = GameObject.FindGameObjectsWithTag("Enemy");
+				for(int i=0;i<sys.initKnightNumber;i++) {
+					if(!Knight[i]) {
+						sensor.AddObservation(0);
+						continue;
+					}
+					if(Knight[i]==this.gameObject) continue;
+					if(inspector.setScriptsFrom(Knight[i])) { //returns true when it's valid
+						if(!inspector.isDead()) {
+							sensor.AddObservation(Knight[i].transform.localPosition.x);
+							sensor.AddObservation(Knight[i].transform.localPosition.z);
+						} else {
+							sensor.AddObservation(0);
+							sensor.AddObservation(0);
+						}
+					} else {
+						sensor.AddObservation(0);
+						continue;
+					}
+				}
+				for(int i=0;i<sys.initEnemyNumber;i++) {
+					if(Enemy[i]==this.gameObject || !Knight[i]) continue;
+					if(inspector.setScriptsFrom(Enemy[i])) { //returns true when it's valid
+						if(!inspector.isDead()) {
+							sensor.AddObservation(Enemy[i].transform.localPosition.x);
+							sensor.AddObservation(Enemy[i].transform.localPosition.z);
+						} else {
+							sensor.AddObservation(-9999999);
+							sensor.AddObservation(-9999999);
+						}
+					}
+				}
 			}
 		}
     }
@@ -155,11 +181,13 @@ public class AgentScript : Agent
     public override void OnActionReceived(float[] act)
     {
 		REWARD=-0.01f;
-        float angle = Mathf.Clamp(act[0], 0, 1) * 360f;
-    	float force = Mathf.Clamp(act[1], 0, 1) * vector_offset;
-        Vector3 controlSignal = Vector3.zero;
-        controlSignal = DegreeToVector2(angle)*force;
-		
+		//print(act[0]+" "+act[1]);
+		float angle = act[0]*360f*Mathf.Deg2Rad;
+    	float force = Mathf.Clamp(act[1], -1, 1) * vector_offset;
+        Vector3 controlSignal = new Vector3(Mathf.Cos(angle),0,Mathf.Sin(angle));
+		controlSignal.Normalize();
+		controlSignal*=force;
+    	//print(controlSignal);
 		if (!dead) {
 			if(lives != startLives){
 				//only use the healthbar when the character lost some lives
@@ -191,10 +219,8 @@ public class AgentScript : Agent
 			float maxDistance=Mathf.Infinity;
 			bool attacking=false;
 			foreach(GameObject enemy in GameObject.FindGameObjectsWithTag("Enemy")) {
-				potentialEnemy.unit = (enemy.GetComponent<Unit>()!=null) ? enemy.GetComponent<Unit>() : null;
-				potentialEnemy.AgentScript = (enemy.GetComponent<AgentScript>()!=null) ? enemy.GetComponent<AgentScript>() : null;
-
-				if(!potentialEnemy.getDeadOrAlive()) {
+				potentialEnemy.setScriptsFrom(enemy);
+				if(!potentialEnemy.isDead()) {
 					float distanceToTarget = Vector3.Distance(this.transform.localPosition, enemy.transform.localPosition);
 					if(distanceToTarget<= agent.stoppingDistance) {
 						maxDistance=(distanceToTarget>maxDistance)?distanceToTarget:maxDistance;
@@ -213,6 +239,7 @@ public class AgentScript : Agent
 						potentialEnemy.setLives(potentialEnemy.getLives()-Time.deltaTime * damage);
 						attacking=true;
 						if(potentialEnemy.getLives()<0) {
+							print("dead!!");
 							REWARD+=2;
 						} else {
 							REWARD+=1;
@@ -258,76 +285,6 @@ public class AgentScript : Agent
 		transform.position = new Vector3(999, 999, 999);
 		//wait a moment and destroy the original unit
 		yield return new WaitForEndOfFrame();
-	}
-    public Transform findCurrentTarget(){  
-		//find all potential targets (enemies of this character)
-		GameObject[] enemies = GameObject.FindGameObjectsWithTag(attackTag);
-		Transform target = null;
-		
-		//if we want this character to communicate with his allies
-		if(spread){
-			//get all enemies
-			List<GameObject> availableEnemies = enemies.ToList();
-			int count = 0;
-			
-			//make sure it doesn't get stuck in an infinite loop
-			while(count < 300){
-				//for all enemies
-				for(int i = 0; i < enemies.Length; i++){
-					//distance between character and its nearest enemy
-					float closestDistance = Mathf.Infinity;
-		
-					foreach(GameObject potentialTarget in availableEnemies){
-						//check if there are enemies left to attack and check per enemy if its closest to this character
-						if(Vector3.Distance(transform.position, potentialTarget.transform.position) < closestDistance && potentialTarget != null){
-							//if this enemy is closest to character, set closest distance to distance between character and enemy
-							closestDistance = Vector3.Distance(transform.position, potentialTarget.transform.position);
-							target = potentialTarget.transform;
-						}
-					}	
-					
-					//if it is valid, return this target
-					if(target && canAttack(target)){
-						return target;
-					}
-					else{
-						//if it's not, remove it from the list and try again
-						availableEnemies.Remove(target.gameObject);
-					}
-				}
-				
-				//after checking all enemies, allow one more ally to also attack the same enemy and try again
-				maxAlliesPerEnemy++;
-				availableEnemies.Clear();
-				availableEnemies = enemies.ToList();
-			
-				count++;
-			}
-			
-			//show a loop error
-			Debug.LogError("Infinite loop");
-		}
-		else{ 
-			//if we're using the simple method:
-            //find closest target between
-			float closestDistance = Mathf.Infinity;
-		
-			foreach(GameObject potentialTarget in enemies){
-				//check if there are enemies left to attack and check per enemy if its closest to this character
-				if(Vector3.Distance(transform.position, potentialTarget.transform.position) < closestDistance && potentialTarget != null){
-					//if this enemy is closest to character, set closest distance to distance between character and enemy
-					closestDistance = Vector3.Distance(transform.position, potentialTarget.transform.position);
-					target = potentialTarget.transform;
-				}
-			}	
-			
-			//check if there's a target and return it
-			if(target)
-				return target;
-		}
-		
-		//otherwise return null
-		return null;
 	}
 	public bool canAttack(Transform target){ //check too much targetting on one instance
 		//get the number of allies that are already attacking this enemy

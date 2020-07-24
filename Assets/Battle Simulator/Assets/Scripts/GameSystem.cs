@@ -17,6 +17,82 @@ public class Troop{
 	public GameObject button;
 }
 
+public class UnitInspect {
+	public Unit UnitScript;
+	public AgentScript AgentScript;
+	public int lives=0;
+	public bool isScriptValid() {
+		return (AgentScript!=null || UnitScript!=null);
+	}
+	public bool isDead() {
+		///Returns true when the unit is dead or valid, otherwise return false
+		if(this.isScriptValid()) {
+			if(AgentScript && !UnitScript) {
+				return AgentScript.dead;
+			} else if(UnitScript && !AgentScript) {
+				return UnitScript.dead;
+			}
+		}
+		return true;
+	}
+	public bool setScriptsFrom(GameObject obj) {
+		UnitScript = (obj.GetComponent<Unit>()!=null) ? obj.GetComponent<Unit>() : null;
+		AgentScript = (obj.GetComponent<AgentScript>()!=null) ? obj.GetComponent<AgentScript>() : null;
+		return isScriptValid();
+	}
+	public bool setEnable(bool t) {
+		if(this.isScriptValid()) {
+			if(AgentScript && !UnitScript) {
+				AgentScript.enabled=t;
+				return true;
+			} else if(UnitScript && !AgentScript) {
+				UnitScript.enabled=t;
+				return true;
+			} else {
+				//what?
+			}
+			return false;
+		} else {
+			return false;
+		}
+	}
+	public bool setSpread(bool t) {
+		if(this.isScriptValid()) {
+			if(AgentScript && !UnitScript) {
+				AgentScript.spread=t;
+				return true;
+			} else if(UnitScript && !AgentScript) {
+				UnitScript.spread=t;
+				return true;
+			} else {
+				//what?
+			}
+			return false;
+		} else {
+			return false;
+		}
+	}
+	public void setLives(float hp) {
+		if(this.isScriptValid() && !this.isDead()) {
+			if(AgentScript && !UnitScript) {
+				AgentScript.lives=hp;
+			} else if(UnitScript && !AgentScript) {
+				UnitScript.lives=hp;
+			}
+		}
+	}
+	public float getLives() {
+		if(this.isScriptValid() && !this.isDead()) {
+			if(AgentScript && !UnitScript) {
+				return AgentScript.lives;
+			} else if(UnitScript && !AgentScript) {
+				return UnitScript.lives;
+			}
+		}
+		return -1;
+	}
+}
+
 
 public class GameSystem : MonoBehaviour {
 	
@@ -64,7 +140,8 @@ public class GameSystem : MonoBehaviour {
 	
 	[Header("Troops:")]
 	public List<Troop> troops;
-	public int enemyNumber, knightNumber, initEnemyNumber, initKnightNumber;
+	public int enemyNumber, knightNumber;
+	public const int initEnemyNumber=1, initKnightNumber=2; //need to be implemented
 	//not visible in the inspector
 	private int selected;
 	private GameObject currentDemoCharacter;
@@ -85,6 +162,7 @@ public class GameSystem : MonoBehaviour {
 	private int gridSize;
 	private bool EpisodeEnded=false;
 	private bool IsEditingMode=false;
+	private UnitInspect inspector = new UnitInspect();
 	void Awake(){
 		knightNumber=0;
 		enemyNumber=0;
@@ -257,29 +335,28 @@ public class GameSystem : MonoBehaviour {
 		if(battleStarted){
 			knightNumber=0;
 			enemyNumber=0;
-			foreach(GameObject Knight in GameObject.FindGameObjectsWithTag("Knight")) {
-				if(Knight.GetComponent<AgentScript>() != null && !Knight.GetComponent<AgentScript>().dead) {
-					knightNumber+=1;
-				} else if(Knight.GetComponent<Unit>() != null && !Knight.GetComponent<Unit>().dead) {
+
+			GameObject[] Knights = GameObject.FindGameObjectsWithTag("Knight");
+			GameObject[] Enemies = GameObject.FindGameObjectsWithTag("Enemy");
+			for(int i=0;i<Knights.Length;i++) {
+				if(inspector.setScriptsFrom(Knights[i]) && !inspector.isDead()) {
 					knightNumber+=1;
 				} else {
 					//What are you?
 				}
 			}
-			foreach(GameObject Enemy in GameObject.FindGameObjectsWithTag("Enemy")) {
-				if(Enemy.GetComponent<AgentScript>() != null && !Enemy.GetComponent<AgentScript>().dead) {
-					enemyNumber+=1;
-				} else if(Enemy.GetComponent<Unit>() != null && !Enemy.GetComponent<Unit>().dead) {
+			for(int i=0;i<Enemies.Length;i++) {
+				if(inspector.setScriptsFrom(Enemies[i]) && !inspector.isDead()) {
 					enemyNumber+=1;
 				} else {
 					//What are you?
 				}
 			}
-			
 			if(knightNumber <= 0){
 				if(IsEditingMode) {
 					endPanel.SetTrigger("defeat");
 				}
+				print("HI!!!");
 				endGame();
 			}
 			else if(enemyNumber <= 0){
@@ -730,41 +807,39 @@ public class GameSystem : MonoBehaviour {
 	}
 	
 	public void disableUnit(GameObject unit){
-		//disable the navmesh agent component
-		unit.GetComponent<NavMeshAgent>().enabled = false;
-		unit.GetComponent<Collider>().enabled = false;
+		if(unit) {
+			inspector.setScriptsFrom(unit);
+			//disable the navmesh agent component
+			unit.GetComponent<NavMeshAgent>().enabled = false;
+			unit.GetComponent<Collider>().enabled = false;
 
-		//if this is an archer, disable the archer functionality
-		if(unit.GetComponent<Unit>()) {
-			Unit unitScript = unit.GetComponent<Unit>();
-			unitScript.spread = levelData.spreadUnits;
-			unitScript.enabled = false;
-		}
-		if(unit.GetComponent<Archer>())
-			unit.GetComponent<Archer>().enabled = false;
-		if(unit.GetComponent<AgentScript>()) {
-			unit.GetComponent<AgentScript>().spread = levelData.spreadUnits;
-			unit.GetComponent<AgentScript>().enabled = false;
-		}
-		/*
-		foreach (MonoBehaviour component in unit.GetComponents<MonoBehaviour>()) {
-			if(component.type == "CustomBehaviour") {
-				print("haha");
-				this.enabled = false;
+			//if this is an archer, disable the archer functionality
+			if(inspector.isScriptValid()) {
+				inspector.setEnable(false);
+				inspector.setSpread(levelData.spreadUnits);
 			}
-		}
-		*/
-		//disable the health object
-		unit.transform.Find("Health").gameObject.SetActive(false);	
-		
-		//disable any particles
-		foreach(ParticleSystem particles in unit.GetComponentsInChildren<ParticleSystem>()){
-			particles.gameObject.SetActive(false);
-		}
-		
-		//make sure it's playing an idle animation
-		foreach(Animator animator in unit.GetComponentsInChildren<Animator>()){
-			animator.SetBool("Start", false);
+			if(unit.GetComponent<Archer>())
+				unit.GetComponent<Archer>().enabled = false;
+			/*
+			foreach (MonoBehaviour component in unit.GetComponents<MonoBehaviour>()) {
+				if(component.type == "CustomBehaviour") {
+					print("haha");
+					this.enabled = false;
+				}
+			}
+			*/
+			//disable the health object
+			unit.transform.Find("Health").gameObject.SetActive(false);	
+			
+			//disable any particles
+			foreach(ParticleSystem particles in unit.GetComponentsInChildren<ParticleSystem>()){
+				particles.gameObject.SetActive(false);
+			}
+			
+			//make sure it's playing an idle animation
+			foreach(Animator animator in unit.GetComponentsInChildren<Animator>()){
+				animator.SetBool("Start", false);
+			}
 		}
 	}
 	
@@ -773,17 +848,12 @@ public class GameSystem : MonoBehaviour {
 		unit.GetComponent<NavMeshAgent>().enabled = true;
 		unit.GetComponent<Collider>().enabled = true;
 		unit.GetComponent<AudioSource>().Play();
-		//nit.GetComponent<Rigidbody>().isKinematic = false;
-		//enable the archer
-		if(unit.GetComponent<Unit>()) {
-			Unit unitScript = unit.GetComponent<Unit>();
-			unitScript.enabled = true;
+		if(inspector.setScriptsFrom(unit)) {
+			inspector.setEnable(true);
 		}
 		if(unit.GetComponent<Archer>())
 			unit.GetComponent<Archer>().enabled = true;
-		if(unit.GetComponent<AgentScript>()) {
-			unit.GetComponent<AgentScript>().enabled = true;
-		}
+		
 		unit.transform.Find("Health").gameObject.SetActive(true);	
 		
 		//show particles
@@ -802,16 +872,9 @@ public class GameSystem : MonoBehaviour {
 		SceneManager.LoadScene(SceneManager.GetActiveScene().name);
 	}
 	
-	public void nextLevel(){
-		//open the next level
-		StartCoroutine(openLevel());
-	}
-	
-	IEnumerator openLevel(){
+	public void openLevel(){
 		//wait for the fade transition to end
 		//transition.SetTrigger("fade");
-		
-		yield return new WaitForSeconds(0);
 		
 		//check if the next level exist and load it if it does
 		if(PlayerPrefs.GetInt("level") < levelData.levels.Count){
@@ -868,8 +931,10 @@ public class GameSystem : MonoBehaviour {
 	
 	public void startBattle(){
 		//enable all units so they start fighting
+		/*
 		initEnemyNumber=GameObject.FindGameObjectsWithTag("Enemy").Length;
 		initKnightNumber=GameObject.FindGameObjectsWithTag("Knight").Length;
+		*/
 		print(initEnemyNumber+" "+initKnightNumber);
 		foreach(GameObject ally in placedUnits){
 			enableUnit(ally);
@@ -895,12 +960,8 @@ public class GameSystem : MonoBehaviour {
 		gamePanel.SetBool("show", false);
 		//do something
 		if(!IsEditingMode) {
-			/*foreach(AgentScript Agent in GetComponents<AgentScript>()) {
-				Agent.EndEpisode();
-			}
-			*/
 			EpisodeEnded=true;
-			nextLevel();
+			openLevel();
 		}
 	}
 	

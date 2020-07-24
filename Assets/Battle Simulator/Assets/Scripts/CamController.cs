@@ -20,6 +20,7 @@ public class CamController : MonoBehaviour {
 	private int Sticky = 0;
 	private GameObject[] Knight;
 	private GameObject thatKnight;
+	private UnitInspect inspector;
 	List<int> AvailableStick = new List<int>();
     void Start(){
 		//get start rotation
@@ -33,6 +34,7 @@ public class CamController : MonoBehaviour {
     }
 	
 	void Update(){
+		inspector = new UnitInspect();
 		//don't move the camera if we're in 2d grid mode
 		if(characterPlacer.grid && characterPlacer.grid.GetBool("show"))
 			return;
@@ -75,10 +77,7 @@ public class CamController : MonoBehaviour {
 		if(characterPlacer.knightNumber>=1) {
 			Knight=GameObject.FindGameObjectsWithTag("Knight");
 			for(int i=0;i<Knight.Length;i++) {
-				thatKnight=Knight[i];
-				if(thatKnight.GetComponent<AgentScript>() != null && !thatKnight.GetComponent<AgentScript>().dead) {
-					AvailableStick.Add(i);
-				} else if(thatKnight.GetComponent<Unit>() != null && !thatKnight.GetComponent<Unit>().dead) {
+				if(inspector.setScriptsFrom(Knight[i]) && !inspector.isDead()) {
 					AvailableStick.Add(i);
 				} else {
 					continue;
@@ -86,7 +85,7 @@ public class CamController : MonoBehaviour {
 			}
 			if(Sticky<0) Sticky=AvailableStick.Count-1;
 			if(Sticky>AvailableStick.Count-1) Sticky=0;
-			if(AvailableStick!=null) {
+			if(AvailableStick.Contains(Sticky)) {
 				transform.position = new Vector3(Knight[AvailableStick[Sticky]].transform.position.x,transform.position.y,Knight[AvailableStick[Sticky]].transform.position.z);
 			}
 		}

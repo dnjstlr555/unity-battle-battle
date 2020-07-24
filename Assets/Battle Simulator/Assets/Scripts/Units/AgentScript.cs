@@ -7,49 +7,8 @@ using UnityEngine.UI;
 using UnityEngine.AI;
 using System.Linq;
 
-class UnitInspect {
-	public Unit UnitScript;
-	public AgentScript AgentScript;
-	public int lives=0;
-	public bool isScriptValid() {
-		return (AgentScript!=null || UnitScript!=null);
-	}
-	public bool setScriptsFrom(GameObject obj) {
-		UnitScript = (obj.GetComponent<Unit>()!=null) ? obj.GetComponent<Unit>() : null;
-		AgentScript = (obj.GetComponent<AgentScript>()!=null) ? obj.GetComponent<AgentScript>() : null;
-		return isScriptValid();
-	}
-	public float getLives() {
-		if(this.isScriptValid() && !this.isDead()) {
-			if(AgentScript && !UnitScript) {
-				return AgentScript.lives;
-			} else if(UnitScript && !AgentScript) {
-				return UnitScript.lives;
-			}
-		}
-		return -1;
-	}
-	public void setLives(float hp) {
-		if(this.isScriptValid() && !this.isDead()) {
-			if(AgentScript && !UnitScript) {
-				AgentScript.lives=hp;
-			} else if(UnitScript && !AgentScript) {
-				UnitScript.lives=hp;
-			}
-		}
-	}
-	public bool isDead() {
-		///Returns true when the unit is dead or valid, otherwise return false
-		if(this.isScriptValid()) {
-			if(AgentScript && !UnitScript) {
-				return AgentScript.dead;
-			} else if(UnitScript && !AgentScript) {
-				return UnitScript.dead;
-			}
-		}
-		return true;
-	}
-}
+//public UnitInspect class located at GameSystem.cs
+
 public class AgentScript : Agent
 {
     public float lives;
@@ -88,6 +47,49 @@ public class AgentScript : Agent
     public Transform Target;
 	private float REWARD;
 	private GameSystem sys;
+	private Vector3 initPosition;
+	private void disableUnit(GameObject unit){
+		if(unit) {
+			UnitInspect inspector = new UnitInspect();
+			LevelData levelData = Resources.Load("Level data") as LevelData;
+			inspector.setScriptsFrom(unit);
+			//disable the navmesh agent component
+			unit.GetComponent<NavMeshAgent>().enabled = false;
+			unit.GetComponent<Collider>().enabled = false;
+
+			//if this is an archer, disable the archer functionality
+			if(inspector.isScriptValid()) {
+				inspector.setEnable(false);
+				inspector.setSpread(levelData.spreadUnits);
+			}
+			if(unit.GetComponent<Archer>())
+				unit.GetComponent<Archer>().enabled = false;
+			/*
+			foreach (MonoBehaviour component in unit.GetComponents<MonoBehaviour>()) {
+				if(component.type == "CustomBehaviour") {
+					print("haha");
+					this.enabled = false;
+				}
+			}
+			*/
+			//disable the health object
+			unit.transform.Find("Health").gameObject.SetActive(false);	
+			
+			//disable any particles
+			foreach(ParticleSystem particles in unit.GetComponentsInChildren<ParticleSystem>()){
+				particles.gameObject.SetActive(false);
+			}
+			
+			//make sure it's playing an idle animation
+			foreach(Animator animator in unit.GetComponentsInChildren<Animator>()){
+				animator.SetBool("Start", false);
+			}
+		}
+	}
+	public override void Initialize() {
+		//disableUnit(this.gameObject);
+		initPosition=this.gameObject.transform.position;
+	}
     public override void OnEpisodeBegin() {
 		//if()
 		print("NewEpisode");
@@ -124,10 +126,12 @@ public class AgentScript : Agent
     }
     public override void CollectObservations(VectorSensor sensor)
     {
+		const int PlannedObs=GameSystem.initKnightNumber+GameSystem.initEnemyNumber;
 		sys = GameObject.FindObjectOfType<GameSystem>();
 		if(sys!=null) {
 			if(!sys.battleStarted) {
-				for(int i=0;i<sys.placedUnits.Count;i++) {
+				for(int i=0;i<PlannedObs;i++) {
+					sensor.AddObservation(0);
 					sensor.AddObservation(0);
 				}
 			} else {
@@ -136,8 +140,9 @@ public class AgentScript : Agent
 				sensor.AddObservation(transform.localPosition.z);
 				GameObject[] Knight = GameObject.FindGameObjectsWithTag("Knight");
 				GameObject[] Enemy = GameObject.FindGameObjectsWithTag("Enemy");
-				for(int i=0;i<sys.initKnightNumber;i++) {
-					if(!Knight[i]) {
+				for(int i=0;i<GameSystem.initKnightNumber;i++) {
+					if(Knight[i] == null) {
+						sensor.AddObservation(0);
 						sensor.AddObservation(0);
 						continue;
 					}
@@ -150,23 +155,38 @@ public class AgentScript : Agent
 							sensor.AddObservation(0);
 							sensor.AddObservation(0);
 						}
-					} else {
+						continue;
+					}
+					sensor.AddObservation(0);
+					sensor.AddObservation(0);
+					continue;
+				}
+				for(int i=0;i<GameSystem.initEnemyNumber;i++) {
+					if(Enemy[i] == null) {
+						sensor.AddObservation(0);
 						sensor.AddObservation(0);
 						continue;
 					}
-				}
-				for(int i=0;i<sys.initEnemyNumber;i++) {
-					if(Enemy[i]==this.gameObject || !Knight[i]) continue;
+					if(Enemy[i]==this.gameObject) continue;
 					if(inspector.setScriptsFrom(Enemy[i])) { //returns true when it's valid
 						if(!inspector.isDead()) {
 							sensor.AddObservation(Enemy[i].transform.localPosition.x);
 							sensor.AddObservation(Enemy[i].transform.localPosition.z);
 						} else {
-							sensor.AddObservation(-9999999);
-							sensor.AddObservation(-9999999);
+							sensor.AddObservation(0);
+							sensor.AddObservation(0);
 						}
+						continue;
 					}
+					sensor.AddObservation(0);
+					sensor.AddObservation(0);
+					continue;
 				}
+			}
+		} else {
+ 			for(int i=0;i<PlannedObs;i++) { //placeholder
+				 sensor.AddObservation(0);
+				 sensor.AddObservation(0);
 			}
 		}
     }
@@ -188,7 +208,7 @@ public class AgentScript : Agent
 		controlSignal.Normalize();
 		controlSignal*=force;
     	//print(controlSignal);
-		if (!dead) {
+		if (!dead && this.enabled) {
 			if(lives != startLives){
 				//only use the healthbar when the character lost some lives
 				if(!health.activeSelf)
@@ -200,7 +220,7 @@ public class AgentScript : Agent
 		
 			//if character ran out of lives, it should die
 			if(lives < 0)
-				StartCoroutine(die());
+				die();
 				//if()
 			if(dustEffect && animator.GetBool("Attacking") == false && !dustEffect.isPlaying)
 				dustEffect.Play();
@@ -259,32 +279,21 @@ public class AgentScript : Agent
 				}
 			}
 			SetReward(REWARD);
-		/*
-			// Rewards
-			float distanceToTarget = Vector3.Distance(this.transform.localPosition, findCurrentTarget().localPosition);
-
-			// Reached target
-			if (distanceToTarget < 1.42f)
-			{
-				SetReward(1.0f);
-				EndEpisode();
-			}
-			// Fell off platform
-			*/
 		} else {
 			agent.isStopped = true;
 			SetReward(-0.03f);
 		}
 			
     }
-	public IEnumerator die() {
+	public void die() {
 		dead = true;
 		SetReward(-1f);
 		//create the ragdoll at the current position
 		Instantiate(ragdoll, transform.position, transform.rotation);
 		transform.position = new Vector3(999, 999, 999);
+		//disableUnit(this.gameObject);
 		//wait a moment and destroy the original unit
-		yield return new WaitForEndOfFrame();
+		//EndEpisode();
 	}
 	public bool canAttack(Transform target){ //check too much targetting on one instance
 		//get the number of allies that are already attacking this enemy

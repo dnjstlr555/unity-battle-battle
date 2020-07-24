@@ -3,6 +3,8 @@ using System.Collections;
 
 public class Archer : MonoBehaviour {
 	
+	public const string ScriptType="CustomBehaviour";
+	
 	//variables visible in the inspector
 	public GameObject arrow;
 	public Transform arrowSpawner;

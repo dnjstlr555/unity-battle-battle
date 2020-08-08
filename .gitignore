@@ -105,4 +105,5 @@ Assets/.DS_Store
 Python/envs
 Virtualenv/
 Assets/ML-Agent/Examples
+UnitySDK.log
 #find . -name .DS_Store -print0 | xargs -0 git rm -f --ignore-unmatch

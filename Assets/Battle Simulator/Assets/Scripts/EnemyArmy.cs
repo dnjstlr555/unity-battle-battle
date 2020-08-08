@@ -38,7 +38,7 @@ public class EnemyArmy : MonoBehaviour {
 		for(int x = 0; x < levelGridSize; x++){
 			for(int z = 0; z < levelGridSize; z++){
 				//get the 3d position and the unit for that position
-				Vector3 position = new Vector3(startPosition.x - ((float)x * sizeGrid), startPosition.y, startPosition.z - ((float)z * sizeGrid));
+				Vector3 position = new Vector3(startPosition.x - ((float)x * sizeGrid + Random.Range(-10.0f, 10.0f)), startPosition.y, startPosition.z - ((float)z * sizeGrid + Random.Range(-10.0f, 10.0f)));
 				GameObject unit = levelData.levels[levelIndex].units[currentPosition];
 				
 				if(unit != null){

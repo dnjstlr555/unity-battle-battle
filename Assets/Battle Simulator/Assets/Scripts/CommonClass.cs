@@ -21,9 +21,6 @@ public class UnitInspect {
 	public bool isScriptValid() {
 		return (AgentScript!=null || UnitScript!=null);
 	}
-	public string getType() {
-		return(AgentScript!=null)?"AgentScript":((UnitScript!=null)?"Unit":null);
-	}
 	public bool isDead() {
 		///Returns true when the unit is dead or valid, otherwise return false
 		if(this.isScriptValid()) {
@@ -34,6 +31,35 @@ public class UnitInspect {
 			}
 		}
 		return true;
+	}
+	public string getType() {
+		return(AgentScript!=null)?"AgentScript":((UnitScript!=null)?"Unit":null);
+	}
+	public float getLives() {
+		if(this.isScriptValid() && !this.isDead()) {
+			if(AgentScript && !UnitScript) {
+				return AgentScript.lives;
+			} else if(UnitScript && !AgentScript) {
+				return UnitScript.lives;
+			}
+		}
+		return -1;
+	}
+    public List<GameObject> getCurrentUnits() {
+        List<GameObject> units=new List<GameObject>();
+        units.AddRange(GameObject.FindGameObjectsWithTag("Knight"));
+        units.AddRange(GameObject.FindGameObjectsWithTag("Enemy"));
+        return units;
+    }
+	public List<GameObject> getCurrentKnights() {
+        List<GameObject> units=new List<GameObject>();
+        units.AddRange(GameObject.FindGameObjectsWithTag("Knight"));
+        return units;
+    }
+	public List<GameObject> getCurrentEnemys() {
+		List<GameObject> units=new List<GameObject>();
+        units.AddRange(GameObject.FindGameObjectsWithTag("Enemy"));
+        return units;
 	}
 	public bool setScriptsFrom(GameObject obj) {
 		try {
@@ -98,20 +124,19 @@ public class UnitInspect {
             AgentScript.Done();
         }
     }
-	public float getLives() {
-		if(this.isScriptValid() && !this.isDead()) {
-			if(AgentScript && !UnitScript) {
-				return AgentScript.lives;
-			} else if(UnitScript && !AgentScript) {
-				return UnitScript.lives;
+	public void AgentAlwaysUpdate() {
+		if(this.isScriptValid() && this.getType()=="AgentScript") {
+            AgentScript.AgentAlwaysUpdate();
+        }
+	}
+	public float AvgLives(List<GameObject> objs) {
+		float sum=0;
+		foreach(GameObject obj in objs) {
+			if(setScriptsFrom(obj)) {
+				if(!isDead()) sum+=getLives();
 			}
 		}
-		return -1;
+		return sum/objs.Count;
 	}
-    public List<GameObject> getCurrentUnits() {
-        List<GameObject> units=new List<GameObject>();
-        units.AddRange(GameObject.FindGameObjectsWithTag("Knight"));
-        units.AddRange(GameObject.FindGameObjectsWithTag("Enemy"));
-        return units;
-    }
+	
 }

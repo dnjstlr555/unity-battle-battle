@@ -18,7 +18,7 @@ public class CamController : MonoBehaviour {
 	
 	private GameSystem characterPlacer;
 	private int Sticky = 0;
-	private GameObject[] Knight;
+	private GameObject[] Units;
 	private GameObject thatKnight;
 	private UnitInspect inspector;
 	List<int> AvailableStick = new List<int>();
@@ -71,10 +71,10 @@ public class CamController : MonoBehaviour {
 		//move camera when you scroll
 		transform.Translate(new Vector3(0, 0, Input.GetAxis("Mouse ScrollWheel")) * zoomSpeed * timescale);
 		AvailableStick.Clear();
-		if(characterPlacer.knightNumber>=1) {
-			Knight=GameObject.FindGameObjectsWithTag("Knight");
-			for(int i=0;i<Knight.Length;i++) {
-				if(inspector.setScriptsFrom(Knight[i]) && !inspector.isDead()) {
+		if(characterPlacer.knightNumber>=1 || characterPlacer.enemyNumber>=1) {
+			Units=inspector.getCurrentUnits().ToArray();
+			for(int i=0;i<Units.Length;i++) {
+				if(inspector.setScriptsFrom(Units[i]) && !inspector.isDead()) {
 					AvailableStick.Add(i);
 				} else {
 					continue;
@@ -83,7 +83,7 @@ public class CamController : MonoBehaviour {
 			if(Sticky<0) Sticky=AvailableStick.Count-1;
 			if(Sticky>AvailableStick.Count-1) Sticky=0;
 			if(AvailableStick.Contains(Sticky)) {
-				transform.position = new Vector3(Knight[AvailableStick[Sticky]].transform.position.x,transform.position.y,Knight[AvailableStick[Sticky]].transform.position.z);
+				transform.position = new Vector3(Units[AvailableStick[Sticky]].transform.position.x,transform.position.y,Units[AvailableStick[Sticky]].transform.position.z);
 			}
 		}
 	}	

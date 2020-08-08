@@ -45,22 +45,22 @@ public class GameSystem : MonoBehaviour {
 	
 	[Space(5)]
 	public Dropdown speedSetting;
+	public int initEnemyNumber, initKnightNumber; 
 	
 	[Space(5)]
 
 	[Header("Troops:")]
 	public List<Troop> troops;
-	public int enemyNumber, knightNumber;
-	public const int initEnemyNumber=1, initKnightNumber=2; //need to be implemented
-	//not visible in the inspector
+	public MLAgents.Brain brain;
+
 	private int selected;
 	private GameObject currentDemoCharacter;
 	private int rotation = -90;
-	public List<GameObject> placedUnits = new List<GameObject>();
-	
+	[HideInInspector] public List<GameObject> placedUnits = new List<GameObject>();
+	[HideInInspector] public bool battleStarted;
+	[HideInInspector] public int enemyNumber, knightNumber;
 	private bool erasing;
 	private int coins;
-	public bool battleStarted;
 	private bool erasingUsingKey;
 	private LevelData levelData;
 	private bool characterStats;
@@ -68,8 +68,6 @@ public class GameSystem : MonoBehaviour {
 	private GameObject border;
 	private int gridSize;
 	private UnitInspect inspector = new UnitInspect();
-	public const bool IsEditingMode=false;
-	public MLAgents.Brain brain;
 
 	public void Academy_Initialize() {
 		print("Initializing Game System");
@@ -82,7 +80,7 @@ public class GameSystem : MonoBehaviour {
 
 		//if the level exists, show some level info, else load the end screen
 		if(PlayerPrefs.GetInt("level") >= levelData.levels.Count){
-			print("Invalid level data, Load default level - " + PlayerPrefs.GetInt("level"));
+			Debug.LogError("Invalid level data, Load default level - " + PlayerPrefs.GetInt("level"));
 			PlayerPrefs.SetInt("level", 0);
 		}
 		else{
@@ -102,12 +100,6 @@ public class GameSystem : MonoBehaviour {
 		battleStarted=false;
 		placedUnits.Clear();
 	}
-	public void initKnight() {
-		print("initing knght!!");
-		foreach(GameObject knight in GameObject.FindGameObjectsWithTag("Knight")) {
-			knight.GetComponent<AgentScript>().Done();
-		}
-	}
 	public void Academy_Start() {
 		Academy_Spawn();
 	}
@@ -116,6 +108,7 @@ public class GameSystem : MonoBehaviour {
 		selected=4;
 		placeAgent(new Vector3(3.2f,0,-9.7f));
 		placeAgent(new Vector3(3.0f,0.0f,2.9f));
+		placeAgent(new Vector3(3.0f,0.0f,9.7f));
 	}
 	public void Academy_Update() {
 		if(battleStarted){

@@ -10,6 +10,8 @@ public class MyAcademy : Academy
     private UnitInspect inspector;
     private bool firstResetPassed = false;
     public override void InitializeAcademy() {
+        Monitor.SetActive(true);
+
         sys=FindObjectOfType<GameSystem>();
         enemysys=FindObjectOfType<EnemyArmy>();
         inspector=new UnitInspect();
@@ -47,6 +49,7 @@ public class MyAcademy : Academy
                 if(inspector.setScriptsFrom(unit)) {
                     if(inspector.getType()=="AgentScript" && !inspector.isDead()) {
                         inspector.AgentDescisionRequest();
+                        inspector.AgentAlwaysUpdate();
                     }
                 }
             }
@@ -54,6 +57,10 @@ public class MyAcademy : Academy
             sys.Academy_Update();
             if(sys.battleStarted && (sys.knightNumber<=0 || sys.enemyNumber<=0)) {
                 print("Episode Ended");
+                Debug.Log(((sys.knightNumber<=0)?"Knight Eliminated ":"Knight Win ")+inspector.AvgLives(inspector.getCurrentKnights()).ToString()+" "+inspector.AvgLives(inspector.getCurrentEnemys()).ToString());
+                Monitor.Log("LastAvgLivesOfKnight", inspector.AvgLives(inspector.getCurrentKnights()), this.transform);
+                Monitor.Log("LastAvgLivesOfEnemy", inspector.AvgLives(inspector.getCurrentEnemys()), this.transform);
+                
                 EndEpisode();
             }
         }

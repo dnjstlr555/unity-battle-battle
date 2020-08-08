@@ -35,9 +35,6 @@ public class CamController : MonoBehaviour {
 	
 	void Update(){
 		inspector = new UnitInspect();
-		//don't move the camera if we're in 2d grid mode
-		if(characterPlacer.grid && characterPlacer.grid.GetBool("show"))
-			return;
 		
 		//don't use time.deltatime if the timescale is 0
 		if(Time.timeScale == 0){

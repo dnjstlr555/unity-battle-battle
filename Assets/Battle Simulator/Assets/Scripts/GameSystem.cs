@@ -8,90 +8,6 @@ using UnityEngine.SceneManagement;
 
 //troop class so we can build different troops/characters
 [System.Serializable]
-public class Troop{
-	public GameObject deployableTroops;
-	public int troopCosts;
-	public Sprite buttonImage;
-	
-	[HideInInspector]
-	public GameObject button;
-}
-
-public class UnitInspect {
-	public Unit UnitScript;
-	public AgentScript AgentScript;
-	public int lives=0;
-	public bool isScriptValid() {
-		return (AgentScript!=null || UnitScript!=null);
-	}
-	public bool isDead() {
-		///Returns true when the unit is dead or valid, otherwise return false
-		if(this.isScriptValid()) {
-			if(AgentScript && !UnitScript) {
-				return AgentScript.dead;
-			} else if(UnitScript && !AgentScript) {
-				return UnitScript.dead;
-			}
-		}
-		return true;
-	}
-	public bool setScriptsFrom(GameObject obj) {
-		UnitScript = (obj.GetComponent<Unit>()!=null) ? obj.GetComponent<Unit>() : null;
-		AgentScript = (obj.GetComponent<AgentScript>()!=null) ? obj.GetComponent<AgentScript>() : null;
-		return isScriptValid();
-	}
-	public bool setEnable(bool t) {
-		if(this.isScriptValid()) {
-			if(AgentScript && !UnitScript) {
-				AgentScript.enabled=t;
-				return true;
-			} else if(UnitScript && !AgentScript) {
-				UnitScript.enabled=t;
-				return true;
-			} else {
-				//what?
-			}
-			return false;
-		} else {
-			return false;
-		}
-	}
-	public bool setSpread(bool t) {
-		if(this.isScriptValid()) {
-			if(AgentScript && !UnitScript) {
-				AgentScript.spread=t;
-				return true;
-			} else if(UnitScript && !AgentScript) {
-				UnitScript.spread=t;
-				return true;
-			} else {
-				//what?
-			}
-			return false;
-		} else {
-			return false;
-		}
-	}
-	public void setLives(float hp) {
-		if(this.isScriptValid() && !this.isDead()) {
-			if(AgentScript && !UnitScript) {
-				AgentScript.lives=hp;
-			} else if(UnitScript && !AgentScript) {
-				UnitScript.lives=hp;
-			}
-		}
-	}
-	public float getLives() {
-		if(this.isScriptValid() && !this.isDead()) {
-			if(AgentScript && !UnitScript) {
-				return AgentScript.lives;
-			} else if(UnitScript && !AgentScript) {
-				return UnitScript.lives;
-			}
-		}
-		return -1;
-	}
-}
 
 
 public class GameSystem : MonoBehaviour {
@@ -102,7 +18,6 @@ public class GameSystem : MonoBehaviour {
 	public Animator endPanel;
 	public Animator buttonsAnimator;
 	public Animator gamePanel;
-	public Animator grid;
 	public Animator transition;
 	public Animator cameraAnimator;
 	
@@ -113,10 +28,8 @@ public class GameSystem : MonoBehaviour {
 	public GameObject characterStatsPanel;
 	public GameObject topDownMapPanel;
 	public GameObject gridCell;
-	public GameObject gridButton;
 	
 	[Space(5)]
-	public Image eraseButton;
 	public Image statsButton;
 	public Image topDownButton;
 	public Image battleIndicator;
@@ -129,15 +42,12 @@ public class GameSystem : MonoBehaviour {
 	public Text statsSpeed;
 	public Text coinsText;
 	public Text levelInfo;
-	public Text gridButtonText;
 	
 	[Space(5)]
 	public Dropdown speedSetting;
 	
 	[Space(5)]
-	public Transform gridPanel;
-	public Transform gridArrow;
-	
+
 	[Header("Troops:")]
 	public List<Troop> troops;
 	public int enemyNumber, knightNumber;
@@ -149,7 +59,6 @@ public class GameSystem : MonoBehaviour {
 	public List<GameObject> placedUnits = new List<GameObject>();
 	
 	private bool erasing;
-	private Color eraseStartColor;
 	private int coins;
 	public bool battleStarted;
 	private bool erasingUsingKey;
@@ -161,42 +70,20 @@ public class GameSystem : MonoBehaviour {
 	private bool mobile;
 	private int gridSize;
 	private bool EpisodeEnded=false;
-	private bool IsEditingMode=false;
 	private UnitInspect inspector = new UnitInspect();
-	void Awake(){
-		knightNumber=0;
-		enemyNumber=0;
-		//get the level data object and check if we're using mobile controls
+	public const bool IsEditingMode=false;
+	public MLAgents.Brain brain;
+
+	public void Academy_Initialize() {
 		levelData = Resources.Load("Level data") as LevelData;
-		mobile = (GameObject.FindObjectOfType<CamJoystick>() != null);
-		EpisodeEnded=false;
-		if(mobile){
-			//if the game has mobile controls, enable the grid, update the button text and don't show the erase button since it doesn't work with the 2D grid
-			levelData.grid = true;
-			gridButtonText.text = "3D view";
-			grid.SetBool("show", true);
-			eraseButton.gameObject.SetActive(false);
-		}
-		
 		//double the grid size so it's always even
 		gridSize = levelData.gridSize * 2;
-		
-		//get the grid center by taking the opposite of the the enemy army position
 		gridCenter = GameObject.FindObjectOfType<EnemyArmy>().gameObject.transform.position;
+		//get the grid center by taking the opposite of the the enemy army position
 		gridCenter = new Vector3(-gridCenter.x, gridCenter.y, gridCenter.z);
-		
-		//if we're using the grid, create a 3D border and a 2D grid
-		if(levelData.grid){
-			createBorder();
-			initializeGrid();
-		}
-		else{
-			gridButton.SetActive(false);
-		}
-		
+
 		//if the level exists, show some level info, else load the end screen
 		if(PlayerPrefs.GetInt("level") >= levelData.levels.Count){
-			//SceneManager.LoadScene("End screen");
 			print("Invalid level data, Load default level - " + PlayerPrefs.GetInt("level"));
 			PlayerPrefs.SetInt("level", 0);
 		}
@@ -204,134 +91,36 @@ public class GameSystem : MonoBehaviour {
 			levelInfo.text = "Level " + (PlayerPrefs.GetInt("level") + 1) + " - " + levelData.levels[PlayerPrefs.GetInt("level")].scene;
 		}
 	}
-	
-	//create the 3d border for grid mode
-	void createBorder(){
-		//get the border start position
-		Vector3 borderStart = gridCenter + new Vector3(-gridSize, 100, -gridSize);
-		//store the current border position (to use during the loop)
-		Vector3 current = borderStart;
-		
-		//create a new gameobject to store the border
-		border = new GameObject();
-		border.transform.position = gridCenter;
-		border.name = "3D grid Border";
-		
-		//loop through both axis
-		for(int z = 0; z <= gridSize; z++){
-			for(int x = 0; x <= gridSize; x++){
-				//get the edge of the square to place the border
-				if(z == 0 || z == gridSize || x == 0 || x == gridSize){
-					//store the hit
-					RaycastHit hit;
-					
-					//if there's a terrain at this position..
-					if(Physics.Raycast(current, -Vector3.up, out hit)){
-						//create a new border object
-						GameObject borderPoint = GameObject.CreatePrimitive(PrimitiveType.Cube);
-						//parent it to the main border object and position it correctly
-						borderPoint.transform.SetParent(border.transform, false);
-						borderPoint.transform.position = hit.point;
-						//remove the collider and change the border material
-						Destroy(borderPoint.GetComponent<Collider>());
-						Material mat = borderPoint.GetComponent<Renderer>().material;
-						mat.shader = Shader.Find("Unlit/UnlitAlphaWithFade");
-						mat.color = levelData.borderColor;
-						
-						if((z == 0 || z == gridSize) && (x == 0 || x == gridSize)){
-							//square object for the corners
-							borderPoint.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
-						}
-						else{
-							//rectangle for the sides
-							if(z == 0 || z == gridSize){
-								borderPoint.transform.localScale = new Vector3(0.7f, 0.2f, 0.1f);
-							}
-							else{
-								borderPoint.transform.localScale = new Vector3(0.1f, 0.2f, 0.7f);
-							}
-						}
-					}
-				}
-				
-				//change the current border position on the x axis
-				current = new Vector3(current.x + 2, current.y, current.z);
-			}
-			
-			//change the z axis for the current border position
-			current = new Vector3(borderStart.x, current.y, current.z + 2);
-		}
+	public void Academy_Awake() {
+		knightNumber=0;
+		enemyNumber=0;
+		battleStarted=false;
+		EpisodeEnded=false;
 	}
-	
-	//create the 2d grid
-	void initializeGrid(){
-		//find the grid layout group component
-		GridLayoutGroup gridGroup = gridPanel.GetComponent<GridLayoutGroup>();
-		
-		//calculate the spacing and cell size based on the grid size
-		gridGroup.cellSize = new Vector2(400f/gridSize, 400f/gridSize);
-		gridGroup.spacing = new Vector2(2.6f/(gridSize * 1.05f) * 20f, 2.6f/(gridSize * 1.1f) * 20f);
-		
-		//loop through all cells
-		for(int i = 0; i < (gridSize * gridSize); i++){
-			//create the cell and parent it to the grid
-			GameObject cell = Instantiate(gridCell);
-			cell.transform.SetParent(gridPanel, false);
-			cell.transform.GetChild(0).gameObject.SetActive(false);
-			
-			//set the cell name to its index
-			cell.transform.name = "" + i;
-			
-			//add a onclick function to the cell
-			cell.GetComponent<Button>().onClick.AddListener(
-			() => { 
-				gridClick(int.Parse(cell.transform.name), cell); 
-			}
-			);
+	public void initKnight() {
+		print("initing knght!!");
+		foreach(GameObject knight in GameObject.FindGameObjectsWithTag("Knight")) {
+			knight.GetComponent<AgentScript>().Done();
 		}
-		
-		//place the red arrow at the bottom of the grid hierarchy so it doesn't change the place index
-		gridArrow.SetSiblingIndex(gridSize * gridSize);
+		placedUnits.Clear();
 	}
-	
-	void Start(){
-		//get the erase button color and store it
-		eraseStartColor = eraseButton.color;
+	public void Academy_Start() {
+		/* placeholder, if stat need to be shown */
 		characterStats = true;
 		switchPanelContent(false);
-		
 		characterStatsPanel.SetActive(false);
+		//enables minimap
 		topDownMapPanel.SetActive(true);
-		if(IsEditingMode) {
-			//show the character buttons in the left panel
-			StartCoroutine(addCharacterButtons());
-			
-			//get the coins for this level and show them
-			//coins = levelData.levels[PlayerPrefs.GetInt("level")].playerCoins;
-			//coinsText.text = coins + "";
-			
-			//initialize some boolean values
-			
-			//setStats(0);
-			selected=4;
-			/*
-			placeUnit(new Vector3(3.2f,0,-9.7f), false);
-			placeUnit(new Vector3(3.0f,0.0f,2.9f), false);
-			startBattle();
-			*/
-		} else {
-			//placeholder
-			//instant transition will be.
-			leftPanelAnimator.SetBool("hide instant", true);
-			selected=4;
-			placeUnit(new Vector3(3.2f,0,-9.7f), false);
-			placeUnit(new Vector3(3.0f,0.0f,2.9f), false);
-			startBattle();
-		}
+		leftPanelAnimator.SetBool("hide instant", true);
+		Academy_Spawn();
+		startBattle();
 	}
-
-	void Update(){
-		//if the battle has started
+	public void Academy_Spawn() {
+		selected=4;
+		placeAgent(new Vector3(3.2f,0,-9.7f));
+		placeAgent(new Vector3(3.0f,0.0f,2.9f));
+	}
+	public void Academy_Update() {
 		if(battleStarted){
 			knightNumber=0;
 			enemyNumber=0;
@@ -353,19 +142,10 @@ public class GameSystem : MonoBehaviour {
 				}
 			}
 			if(knightNumber <= 0){
-				if(IsEditingMode) {
-					endPanel.SetTrigger("defeat");
-				}
 				print("HI!!!");
 				endGame();
 			}
 			else if(enemyNumber <= 0){
-				if(IsEditingMode) {
-					endPanel.SetTrigger("victory");
-					
-				}
-				//PlayerPrefs.SetInt("level" + (PlayerPrefs.GetInt("level") + 1), 1); //won flag for each levels
-				//PlayerPrefs.SetInt("level", PlayerPrefs.GetInt("level") + 1); //next level
 				endGame();
 			}
 			
@@ -402,66 +182,7 @@ public class GameSystem : MonoBehaviour {
 			//return so it will not use the demo
 			return;
 		}
-		if(leftPanelAnimator.GetBool("hide panel")) {
-			//placeholder
-		}
-		
-		
-		//check for the x key to erase characters
-		if((Input.GetKeyDown("x") && !erasing) || (Input.GetKeyUp("x") && erasingUsingKey)){
-			erasingUsingKey = !erasingUsingKey;
-			erasingMode();
-		}
-		
-		//if there is a demo character on the battlefield
-		if(currentDemoCharacter){
-			//get the position of the mouse relative to the terrain
-			Vector3 position = getPosition();
-			
-			//move the demo with the mouse 
-			currentDemoCharacter.transform.position = position;
-			
-			//if we're not currently erasing characters
-			if(!erasing){	
-				//use right mouse button to rotate the character			
-				if(Input.GetMouseButtonDown(1)){
-					rotation += levelData.rotationStep;
-					updateRotation(currentDemoCharacter);
-				}
-				
-				//place a unit when the left mouse button is down
-				if(Input.GetMouseButton(0) && position.x > 0) {
-					placeUnit(position, false);
-					print(position);
-				}
-				//get a color for the demo character and change it based on the validity of the current mouse position
-				Color color = Color.white;
-				if(unitsInRange(position) != null || position.x < 0 || Vector3.Distance(Camera.main.transform.position, position) > levelData.placeRange || !withinGrid(position)){ //|| troops[selected].troopCosts > coins
-					color = levelData.invalidPosition;
-				}
-				else{
-					color = levelData.tileColor;
-				}
-				
-				//change the indicator color
-				foreach(Renderer renderer in currentDemoCharacter.transform.Find("Indicator(Clone)").GetComponentsInChildren<Renderer>()){
-					renderer.material.color = color;
-				}
-			}
-			else if(Input.GetMouseButton(0) || erasingUsingKey){
-				//if we're erasing, check for left mouse button to erase units/characters
-				eraseUnit(position, false, false);
-			}
-			
-			//if the demo character is not playing idle animations, make sure to play idle animations on all of its animators
-			if(currentDemoCharacter.activeSelf && currentDemoCharacter.GetComponent<Animator>() && currentDemoCharacter.GetComponent<Animator>().GetBool("Start") != false){
-				foreach(Animator animator in currentDemoCharacter.GetComponentsInChildren<Animator>()){
-					animator.SetBool("Start", false);
-				}
-			}
-		}
 	}
-	
 	//check if the position is within the 3D grid
 	bool withinGrid(Vector3 position){
 		//if we're not using any grid, it's inside the grid by default
@@ -484,53 +205,15 @@ public class GameSystem : MonoBehaviour {
 		return (float)knightsLeft/(float)total;
 	}
 	
-	//change erasing mode
-	public void erasingMode(){
-		erasing = !erasing;
-		
-		if(erasing){
-			//if we're erasing, don't display a character
-			if(currentDemoCharacter)
-				Destroy(currentDemoCharacter); 
-			
-			//instead of the character, just show the red tile
-			currentDemoCharacter = newTile(levelData.removeColor);
-			eraseButton.color = levelData.eraseButtonColor;
-		}
-		else{
-			//if we're not erasing anymore, create a new demo character
-			changeDemo();
-			eraseButton.color = eraseStartColor;
-		}
-	}
-	
 	//place a new unit
-	public void placeUnit(Vector3 position, bool placingGridCell){
-		//check if the position is valid
-		if(canPlace(position, placingGridCell)){
-			//create a new unit/character and prevent it from moving
-			GameObject unit = Instantiate(troops[selected].deployableTroops, position, Quaternion.identity);
-			disableUnit(unit);
-			
-			//set the correct rotation
-			updateRotation(unit);
-			
-			//add it to the list of placed units
-			placedUnits.Add(unit);
-			
-			//decrease the number of coins left
-			coins -= troops[selected].troopCosts;
-			coinsText.text = coins + "";
-			
-			//if we're using the grid system, update the grid by enabling the cell that corresponds with this position
-			if(levelData.grid){
-				GameObject cell = gridPanel.transform.GetChild(positionToGridIndex(position)).GetChild(0).gameObject;
-				cell.SetActive(true);
-				cell.GetComponent<Image>().sprite = troops[selected].buttonImage;
-			}
+	public void placeAgent(Vector3 position) {
+		if(canPlace(position, false)){
+			GameObject AgentObj = Instantiate(troops[selected].deployableTroops, position, Quaternion.identity);
+			AgentScript unit = AgentObj.GetComponent<AgentScript>();
+			updateRotation(unit.gameObject);
+			placedUnits.Add(unit.gameObject);
 		}
 	}
-	
 	//check if the character can be placed at this position
 	bool canPlace(Vector3 position, bool placingGridCell){
 		//check if there's units too close to the current position
@@ -566,19 +249,6 @@ public class GameSystem : MonoBehaviour {
 		return Vector3.zero;
 	}
 	
-	//called when you click anywhere in the grid
-	public void gridClick(int clickedIndex, GameObject cell){
-		//get the 3d position of this click
-		Vector3 position = gridIndexToPosition(clickedIndex);
-		//if there's a unit already, remove it. Else, add a new one
-		if(cell.transform.GetChild(0).gameObject.activeSelf){
-			eraseUnit(position, false, true);
-		}
-		else{
-			placeUnit(position, true);
-		}
-	}
-	
 	public void eraseUnit(Vector3 position, bool clearing, bool erasingGridCell){
 		//get the unit to erase
 		GameObject unit = unitsInRange(position);
@@ -594,12 +264,6 @@ public class GameSystem : MonoBehaviour {
 			//give the player back his coins
 			coins += troops[unitIndex(unit)].troopCosts;
 			coinsText.text = coins + "";
-			
-			//if we're using the grid, clear this cell
-			if(levelData.grid){
-				GameObject cell = gridPanel.transform.GetChild(positionToGridIndex(position)).GetChild(0).gameObject;
-				cell.SetActive(false);
-			}
 		}
 	}
 	
@@ -631,14 +295,8 @@ public class GameSystem : MonoBehaviour {
 	//hide or show the panel on the left
 	public void showHideLeftPanel(){
 		leftPanelAnimator.SetBool("hide panel", !leftPanelAnimator.GetBool("hide panel"));
-		
-		if(!mobile){
-			if(!leftPanelAnimator.GetBool("hide panel"))
-				changeDemo();
-		}
-		else{
-			grid.SetBool("show", !leftPanelAnimator.GetBool("hide panel"));
-		}
+		if(!leftPanelAnimator.GetBool("hide panel"))
+			changeDemo();
 	}
 	
 	IEnumerator addCharacterButtons(){
@@ -698,7 +356,6 @@ public class GameSystem : MonoBehaviour {
 		if(!mobile)
 			changeDemo();
 		
-		eraseButton.color = Color.white;
 		
 		//change the character statistics
 		setStats(index);
@@ -816,7 +473,7 @@ public class GameSystem : MonoBehaviour {
 			//if this is an archer, disable the archer functionality
 			if(inspector.isScriptValid()) {
 				inspector.setEnable(false);
-				inspector.setSpread(levelData.spreadUnits);
+				//inspector.setSpread(levelData.spreadUnits);
 			}
 			if(unit.GetComponent<Archer>())
 				unit.GetComponent<Archer>().enabled = false;
@@ -850,6 +507,9 @@ public class GameSystem : MonoBehaviour {
 		unit.GetComponent<AudioSource>().Play();
 		if(inspector.setScriptsFrom(unit)) {
 			inspector.setEnable(true);
+		}
+		if(inspector.getType()=="AgentScript") {
+			inspector.setInitAgent(brain);
 		}
 		if(unit.GetComponent<Archer>())
 			unit.GetComponent<Archer>().enabled = true;
@@ -932,15 +592,11 @@ public class GameSystem : MonoBehaviour {
 	public void startBattle(){
 		//enable all units so they start fighting
 		/*
-		initEnemyNumber=GameObject.FindGameObjectsWithTag("Enemy").Length;
-		initKnightNumber=GameObject.FindGameObjectsWithTag("Knight").Length;
-		*/
-		print(initEnemyNumber+" "+initKnightNumber);
 		foreach(GameObject ally in placedUnits){
 			enableUnit(ally);
-		}
+		} */
 		if(FindObjectOfType<EnemyArmy>().IsPlaced()) {
-			FindObjectOfType<EnemyArmy>().startEnemies();
+			//FindObjectOfType<EnemyArmy>().startEnemies();
 		} else {
 			print("Coudln't start battle beacuse the enemy didn't spawn");
 			return;
@@ -958,11 +614,11 @@ public class GameSystem : MonoBehaviour {
 		//end the battle
 		battleStarted = false;
 		gamePanel.SetBool("show", false);
-		//do something
-		if(!IsEditingMode) {
-			EpisodeEnded=true;
-			openLevel();
-		}
+		EpisodeEnded=true;
+		placedUnits.Clear();
+		//cameraAnimator.SetTrigger("shake");
+		GameObject.FindObjectOfType<MyAcademy>().Done();
+		//openLevel();
 	}
 	
 	public void setSpeed(){
@@ -984,42 +640,12 @@ public class GameSystem : MonoBehaviour {
 		}
 	}
 	
-	public void showGrid(){
-		//show or hide the grid and change the button text
-		if(!mobile){
-			if(gridButtonText.text == "Grid Layout"){
-				gridButtonText.text = "Default 3D Layout";
-			}
-			else{
-				gridButtonText.text = "Grid Layout";
-			}
-		
-			grid.SetBool("show", !grid.GetBool("show"));
-		}
-		else{
-			showHideLeftPanel();
-		}
-	}
-	
 	IEnumerator battleUI(){
-		//hide the character panel
-		/*
-		if(!leftPanelAnimator.GetBool("hide panel"))
-			if(!leftPanelAnimator.GetBool("hide instant") && !IsEditingMode)
-				leftPanelAnimator.SetBool("hide instant", true);
-			else
-				leftPanelAnimator.SetBool("hide panel", true);
-		*/
 		//hide the grid
-		grid.SetBool("show", false);
 		leftPanelAnimator.gameObject.SetActive(false);
-		if(IsEditingMode) {
-			buttonsAnimator.SetBool("hide", true);
-		} else {
-			buttonsAnimator.gameObject.SetActive(false);
-			foreach(GameObject UI in GameObject.FindGameObjectsWithTag("Editory")) {
-				UI.SetActive(false);
-			}
+		buttonsAnimator.gameObject.SetActive(false);
+		foreach(GameObject UI in GameObject.FindGameObjectsWithTag("Editory")) {
+			UI.SetActive(false);
 		}
 
 		//wait a moment and remove the panels

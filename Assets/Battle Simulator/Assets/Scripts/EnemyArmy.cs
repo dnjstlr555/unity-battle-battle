@@ -9,8 +9,8 @@ public class EnemyArmy : MonoBehaviour {
 	private LevelData levelData;
 	private List<GameObject> spawnedEnemies = new List<GameObject>();
 	private GameSystem characterPlacement;
-	
-	void Start () {
+	public void Academy_Start () {
+		IsEnemyAllPlaced = false;
 		//find the level data object and get the current level
 		levelData = Resources.Load("Level data") as LevelData;
 		int level = PlayerPrefs.GetInt("level");
@@ -65,7 +65,7 @@ public class EnemyArmy : MonoBehaviour {
 			spawnedEnemies.Add(newUnit);
 			
 			//disable the unit until the battle starts
-			characterPlacement.disableUnit(newUnit);
+			//characterPlacement.disableUnit(newUnit);
 		}
 	}
 	
@@ -74,5 +74,11 @@ public class EnemyArmy : MonoBehaviour {
 		foreach(GameObject enemyUnit in spawnedEnemies){
 			characterPlacement.enableUnit(enemyUnit);
 		}
+	}
+	public void initEnemies(){
+		foreach(GameObject enemyUnit in GameObject.FindGameObjectsWithTag("Enemy")){
+			Destroy(enemyUnit);
+		}
+		spawnedEnemies.Clear();
 	}
 }

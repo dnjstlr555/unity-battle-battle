@@ -202,7 +202,7 @@ namespace MLAgents
 
 
         // Flag used to keep track of the first time the Academy is reset.
-        public bool firstAcademyReset;
+        bool firstAcademyReset;
 
         // The Academy uses a series of events to communicate with agents and
         // brains to facilitate synchronization. More specifically, it ensure
@@ -561,7 +561,6 @@ namespace MLAgents
         {
             EnvironmentReset();
             AgentForceReset();
-            firstAcademyReset = true;
         }
 
         /// <summary>
@@ -602,8 +601,10 @@ namespace MLAgents
             }
             else if (!firstAcademyReset)
             {
+                print("first academic reset");
                 UpdateResetParameters();
                 ForcedFullReset();
+                firstAcademyReset = true;
             }
 
             if ((stepCount >= maxSteps) && maxSteps > 0)
@@ -615,11 +616,12 @@ namespace MLAgents
             AgentSetStatus(maxStepReached, done, stepCount);
 
             brainBatcher.RegisterAcademyDoneFlag(done);
-
+            /*
             if (done)
             {
                 EnvironmentReset();
             }
+            */
 
             AgentResetIfDone();
 

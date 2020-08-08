@@ -8,6 +8,15 @@ public class DeleteParticles : MonoBehaviour {
 	
 	void Start(){
 	//Destroy gameobject (or particles) after lifetime
-	Destroy(gameObject, lifetime);
+		Invoke("DestroyMe", lifetime);
+	}
+	void Update() {
+		if(GameObject.FindObjectOfType<MyAcademy>().IsDone()) {
+			CancelInvoke("DestroyMe");
+			Destroy(gameObject);
+		}
+	}
+	public void DestroyMe() {
+		Destroy(gameObject);
 	}
 }

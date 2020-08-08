@@ -37,7 +37,6 @@ public class AgentScript : Agent
 	private WalkArea area;
 	
 	private ParticleSystem dustEffect;
-	private int maxAlliesPerEnemy;
 	
 	public bool dead;
 
@@ -45,51 +44,41 @@ public class AgentScript : Agent
 	private float REWARD;
 	private GameSystem sys;
 	private Vector3 initPosition;
+	private UnitInspect inspector;
 	const int PlannedObs=GameSystem.initKnightNumber+GameSystem.initEnemyNumber;
 	public override void InitializeAgent() {
 		sys = GameObject.FindObjectOfType<GameSystem>();
-	}
-    public override void AgentReset() {
-		print("NewEpisode");
-
-		//get the audio source
 		source = GetComponent<AudioSource>();
-		maxAlliesPerEnemy = 1;
-	
-		//find navmesh agent component
 		agent = this.GetComponent<NavMeshAgent>();
 		animator = this.GetComponent<Animator>();
-
-		//find objects attached to this character
 		health = transform.Find("Health").gameObject;
 		healthbar = health.transform.Find("Healthbar").gameObject;
 		health.SetActive(false);	
-	
-		//set healtbar value
 		healthbar.GetComponent<Slider>().maxValue = lives;
 		startLives = lives;
 		//get default stopping distance
 		defaultStoppingDistance = agent.stoppingDistance;
-	
 		//if there's a dust effect, find and assign it
 		if(transform.Find("dust"))
 			dustEffect = transform.Find("dust").gameObject.GetComponent<ParticleSystem>();
 		
 		//find the area so the character can walk around
 		area = GameObject.FindObjectOfType<WalkArea>();
+		inspector = new UnitInspect();
+	}
+    public override void AgentReset() {
+		print("NewEpisode");
     }
     public override void CollectObservations()
     {
 		if(sys!=null) {
 			if(!sys.battleStarted) {
+				Debug.LogWarning("Observation triggered before battle started. sending zero observation");
 				for(int i=0;i<PlannedObs;i++) {
 					AddVectorObs(0);
 					AddVectorObs(0);
 				}
 			} else {
-				UnitInspect inspector = new UnitInspect();
-				AddVectorObs(transform.localPosition.x);
-				AddVectorObs(transform.localPosition.z);
 				GameObject[] Knight = GameObject.FindGameObjectsWithTag("Knight");
 				GameObject[] Enemy = GameObject.FindGameObjectsWithTag("Enemy");
 				for(int i=0;i<GameSystem.initKnightNumber;i++) {
@@ -98,17 +87,20 @@ public class AgentScript : Agent
 						AddVectorObs(0);
 						continue;
 					}
-					if(Knight?[i]==this.gameObject) continue;
 					if(inspector.setScriptsFrom(Knight[i])) { //returns true when it's valid
 						if(!inspector.isDead()) {
+							// When alive
 							AddVectorObs(Knight[i].transform.localPosition.x);
 							AddVectorObs(Knight[i].transform.localPosition.z);
 						} else {
+							// When dead
 							AddVectorObs(0);
 							AddVectorObs(0);
 						}
 						continue;
 					}
+					//When script is not valid but it existed as game object
+					Debug.LogError("Unknown game object tagged as knight and it observated.");
 					AddVectorObs(0);
 					AddVectorObs(0);
 					continue;
@@ -119,7 +111,6 @@ public class AgentScript : Agent
 						AddVectorObs(0);
 						continue;
 					}
-					if(Enemy?[i]==this.gameObject) continue;
 					if(inspector.setScriptsFrom(Enemy[i])) { //returns true when it's valid
 						if(!inspector.isDead()) {
 							AddVectorObs(Enemy[i].transform.localPosition.x);
@@ -130,12 +121,14 @@ public class AgentScript : Agent
 						}
 						continue;
 					}
+					Debug.LogError("Unknown game object tagged as knight and it observated.");
 					AddVectorObs(0);
 					AddVectorObs(0);
 					continue;
 				}
 			}
 		} else {
+			Debug.LogError("Observation triggered before even game system instantiate");
  			for(int i=0;i<PlannedObs;i++) { //placeholder
 				 AddVectorObs(0);
 				 AddVectorObs(0);
@@ -171,9 +164,9 @@ public class AgentScript : Agent
 			}
 		
 			//if character ran out of lives, it should die
-			if(lives < 0)
-				die();
-				//if()
+			if(lives < 0) {
+				//die();
+			}
 			if(dustEffect && animator.GetBool("Attacking") == false && !dustEffect.isPlaying)
 				dustEffect.Play();
 
@@ -243,16 +236,19 @@ public class AgentScript : Agent
 			RequestDecision();
 		} else {
 			if(!dead && this.enabled) {
-
+				//Moving towards to destination
 			} else {
-				agent.isStopped = true;
 				SetReward(-0.03f);
 			}
 		}
 	}
 	public void die() {
-		dead = true;
 		SetReward(-1f);
+		Done();
+	}
+	public override void AgentOnDone() {
+		//Theory : if agent still remains after the destroying, Destroy log triggers two times more after episode ends because ending an episode triggers each agent's done function.
+		dead=true;
 		//create the ragdoll at the current position
 		try {
 			Instantiate(ragdoll, transform.position, transform.rotation);
@@ -260,11 +256,8 @@ public class AgentScript : Agent
 		} catch {
 			Debug.LogWarning("Error on placing deadbody. You probably unsigned the ragdoll from editor manually.");
 		}
-		Done();
-	}
-	public override void AgentOnDone() {
-		dead=true;
 		Destroy(gameObject);
+		Destroy(this);
 		Debug.Log("destroy!!!");
 	}
 }

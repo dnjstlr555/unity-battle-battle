@@ -66,15 +66,13 @@ public class GameSystem : MonoBehaviour {
 	private bool characterStats;
 	private Vector3 gridCenter;
 	private GameObject border;
-	
-	private bool mobile;
 	private int gridSize;
-	private bool EpisodeEnded=false;
 	private UnitInspect inspector = new UnitInspect();
 	public const bool IsEditingMode=false;
 	public MLAgents.Brain brain;
 
 	public void Academy_Initialize() {
+		print("Initializing Game System");
 		levelData = Resources.Load("Level data") as LevelData;
 		//double the grid size so it's always even
 		gridSize = levelData.gridSize * 2;
@@ -90,32 +88,31 @@ public class GameSystem : MonoBehaviour {
 		else{
 			levelInfo.text = "Level " + (PlayerPrefs.GetInt("level") + 1) + " - " + levelData.levels[PlayerPrefs.GetInt("level")].scene;
 		}
-	}
-	public void Academy_Awake() {
-		knightNumber=0;
-		enemyNumber=0;
-		battleStarted=false;
-		EpisodeEnded=false;
-	}
-	public void initKnight() {
-		print("initing knght!!");
-		foreach(GameObject knight in GameObject.FindGameObjectsWithTag("Knight")) {
-			knight.GetComponent<AgentScript>().Done();
-		}
-		placedUnits.Clear();
-	}
-	public void Academy_Start() {
-		/* placeholder, if stat need to be shown */
 		characterStats = true;
 		switchPanelContent(false);
 		characterStatsPanel.SetActive(false);
 		//enables minimap
 		topDownMapPanel.SetActive(true);
 		leftPanelAnimator.SetBool("hide instant", true);
+		
+	}
+	public void Academy_Awake() {
+		knightNumber=0;
+		enemyNumber=0;
+		battleStarted=false;
+		placedUnits.Clear();
+	}
+	public void initKnight() {
+		print("initing knght!!");
+		foreach(GameObject knight in GameObject.FindGameObjectsWithTag("Knight")) {
+			knight.GetComponent<AgentScript>().Done();
+		}
+	}
+	public void Academy_Start() {
 		Academy_Spawn();
-		startBattle();
 	}
 	public void Academy_Spawn() {
+		print("Spawning Agents");
 		selected=4;
 		placeAgent(new Vector3(3.2f,0,-9.7f));
 		placeAgent(new Vector3(3.0f,0.0f,2.9f));
@@ -124,31 +121,24 @@ public class GameSystem : MonoBehaviour {
 		if(battleStarted){
 			knightNumber=0;
 			enemyNumber=0;
-
+			List<GameObject> Units = inspector.getCurrentUnits();
+			foreach(GameObject unit in Units) {
+				if(inspector.setScriptsFrom(unit) && !inspector.isDead() && inspector.getLives()<0) {
+					inspector.setDead();
+				}
+			}
 			GameObject[] Knights = GameObject.FindGameObjectsWithTag("Knight");
 			GameObject[] Enemies = GameObject.FindGameObjectsWithTag("Enemy");
 			for(int i=0;i<Knights.Length;i++) {
 				if(inspector.setScriptsFrom(Knights[i]) && !inspector.isDead()) {
 					knightNumber+=1;
-				} else {
-					//What are you?
 				}
 			}
 			for(int i=0;i<Enemies.Length;i++) {
 				if(inspector.setScriptsFrom(Enemies[i]) && !inspector.isDead()) {
 					enemyNumber+=1;
-				} else {
-					//What are you?
 				}
 			}
-			if(knightNumber <= 0){
-				print("HI!!!");
-				endGame();
-			}
-			else if(enemyNumber <= 0){
-				endGame();
-			}
-			
 			//get the current battle status to show in the indicator
 			float fill = BattleStatus();
 			
@@ -176,13 +166,27 @@ public class GameSystem : MonoBehaviour {
 		//don't update the preview character on mobile devices since it uses the 2d grid	
 		//remove the demo character when hiding the left character panel
 		//clear: mobile, battleStarted, activeSelf	
-		if(mobile || battleStarted || !leftPanelAnimator.gameObject.activeSelf){
+		if(battleStarted || !leftPanelAnimator.gameObject.activeSelf){
 			if(currentDemoCharacter)
 				Destroy(currentDemoCharacter);
 			//return so it will not use the demo
 			return;
 		}
 	}
+	public void startBattle(){
+		if(!FindObjectOfType<EnemyArmy>().IsPlaced()) {
+			print("Coudln't start battle beacuse the enemy didn't spawn");
+			return;
+		}
+		//show the new UI
+		StartCoroutine(battleUI());
+		battleStarted = true;
+		
+		//destroy the border object
+		if(border != null)
+			Destroy(border);
+	}
+	
 	//check if the position is within the 3D grid
 	bool withinGrid(Vector3 position){
 		//if we're not using any grid, it's inside the grid by default
@@ -332,10 +336,6 @@ public class GameSystem : MonoBehaviour {
 			//wait to create the button spawn effect
 			yield return new WaitForSeconds(levelData.buttonEffectTime/(float)troops.Count);
 		}
-		
-		//update the demo character
-		if(!mobile)
-			changeDemo();
 	}
 	
 	public void selectTroop(int index){
@@ -351,10 +351,6 @@ public class GameSystem : MonoBehaviour {
 		
 		//stop erasing
 		erasing = false;
-		
-		//update the demo character
-		if(!mobile)
-			changeDemo();
 		
 		
 		//change the character statistics
@@ -532,20 +528,6 @@ public class GameSystem : MonoBehaviour {
 		SceneManager.LoadScene(SceneManager.GetActiveScene().name);
 	}
 	
-	public void openLevel(){
-		//wait for the fade transition to end
-		//transition.SetTrigger("fade");
-		
-		//check if the next level exist and load it if it does
-		if(PlayerPrefs.GetInt("level") < levelData.levels.Count){
-			SceneManager.LoadScene(levelData.levels[PlayerPrefs.GetInt("level")].scene);
-		}
-		else{
-			print("Tried to load invalid level in openlevel()" + PlayerPrefs.GetInt("level"));
-			//SceneManager.LoadScene("End screen");
-		}
-	}
-	
 	public void menu(){
 		//load the menu scene
 		SceneManager.LoadScene(0);
@@ -589,38 +571,7 @@ public class GameSystem : MonoBehaviour {
 		cameraAnimator.SetTrigger("shake");
 	}
 	
-	public void startBattle(){
-		//enable all units so they start fighting
-		/*
-		foreach(GameObject ally in placedUnits){
-			enableUnit(ally);
-		} */
-		if(FindObjectOfType<EnemyArmy>().IsPlaced()) {
-			//FindObjectOfType<EnemyArmy>().startEnemies();
-		} else {
-			print("Coudln't start battle beacuse the enemy didn't spawn");
-			return;
-		}
-		//show the new UI
-		StartCoroutine(battleUI());
-		battleStarted = true;
-		
-		//destroy the border object
-		if(border != null)
-			Destroy(border);
-	}
-	
-	public void endGame(){
-		//end the battle
-		battleStarted = false;
-		gamePanel.SetBool("show", false);
-		EpisodeEnded=true;
-		placedUnits.Clear();
-		//cameraAnimator.SetTrigger("shake");
-		GameObject.FindObjectOfType<MyAcademy>().Done();
-		//openLevel();
-	}
-	
+
 	public void setSpeed(){
 		//change the timescale based on the selected setting
 		switch(speedSetting.value){

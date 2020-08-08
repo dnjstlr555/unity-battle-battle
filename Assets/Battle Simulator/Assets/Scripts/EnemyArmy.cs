@@ -9,15 +9,17 @@ public class EnemyArmy : MonoBehaviour {
 	private LevelData levelData;
 	private List<GameObject> spawnedEnemies = new List<GameObject>();
 	private GameSystem characterPlacement;
-	public void Academy_Start () {
-		IsEnemyAllPlaced = false;
-		//find the level data object and get the current level
-		levelData = Resources.Load("Level data") as LevelData;
-		int level = PlayerPrefs.GetInt("level");
-		
-		//also find the character placement script
+	private int level;
+	public void Academy_Initialize() {
+		print("Initializing Enemy System");
 		characterPlacement = GameObject.FindObjectOfType<GameSystem>();
-		
+
+		levelData = Resources.Load("Level data") as LevelData;
+		level = PlayerPrefs.GetInt("level");
+	}
+	public void Academy_Start () {
+		print("Enemy army spawning");
+		IsEnemyAllPlaced = false;
 		//spawn enemies if this level exists
 		if(level < levelData.levels.Count)
 			spawnEnemies(level);

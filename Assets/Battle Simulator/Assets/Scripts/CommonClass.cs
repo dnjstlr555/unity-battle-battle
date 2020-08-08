@@ -69,6 +69,19 @@ public class UnitInspect {
 			}
 		}
 	}
+    public void setDead() {
+        if(this.isScriptValid() && !this.isDead()) {
+            if(AgentScript) {
+                AgentScript.die();
+            } else if(UnitScript) {
+                UnitScript.die();
+            } else {
+                Debug.LogError("Couldn't setDead() because the script was valid");
+            }
+        } else {
+            Debug.LogError("Couldn't setDead() because the script was valid");
+        }
+    }
 	public void setInitAgent(MLAgents.Brain brain) {
 		if(this.isScriptValid()) {
 			AgentScript.GiveBrain(brain);
@@ -76,10 +89,15 @@ public class UnitInspect {
 		}
 	}
 	public void AgentDescisionRequest() {
-		if(this.isScriptValid()) {
+		if(this.isScriptValid() && this.getType()=="AgentScript") {
 			AgentScript.AgentDescisionRequest();
 		}
 	}
+    public void AgentDone() {
+        if(this.isScriptValid() && this.getType()=="AgentScript") {
+            AgentScript.Done();
+        }
+    }
 	public float getLives() {
 		if(this.isScriptValid() && !this.isDead()) {
 			if(AgentScript && !UnitScript) {
@@ -90,4 +108,10 @@ public class UnitInspect {
 		}
 		return -1;
 	}
+    public List<GameObject> getCurrentUnits() {
+        List<GameObject> units=new List<GameObject>();
+        units.AddRange(GameObject.FindGameObjectsWithTag("Knight"));
+        units.AddRange(GameObject.FindGameObjectsWithTag("Enemy"));
+        return units;
+    }
 }

@@ -126,7 +126,8 @@ public class UnitInspect {
     }
 	public void AgentAlwaysUpdate() {
 		if(this.isScriptValid() && this.getType()=="AgentScript") {
-            AgentScript.AgentAlwaysUpdate();
+            AgentScript.AgentAlwaysUpdateInternal();
+			AgentScript.AgentAlwaysUpdate();
         }
 	}
 	public float AvgLives(List<GameObject> objs) {

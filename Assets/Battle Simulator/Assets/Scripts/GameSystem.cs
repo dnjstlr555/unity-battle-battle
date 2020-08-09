@@ -59,6 +59,7 @@ public class GameSystem : MonoBehaviour {
 	[HideInInspector] public List<GameObject> placedUnits = new List<GameObject>();
 	[HideInInspector] public bool battleStarted;
 	[HideInInspector] public int enemyNumber, knightNumber;
+	[HideInInspector] public bool FirstWarnUseOfAttackFb=false;
 	private bool erasing;
 	private int coins;
 	private bool erasingUsingKey;

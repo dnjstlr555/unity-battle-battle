@@ -18,7 +18,7 @@ public class AgentScript : Agent
 	public AudioClip runAudio;
 	
 	[HideInInspector]
-	private NavMeshAgent agent;
+	public NavMeshAgent agent;
 	private GameObject health;
 	private GameObject healthbar;
 	
@@ -42,7 +42,8 @@ public class AgentScript : Agent
 	private UnitInspect inspector;
 	private int PlannedObs;
 	private float lastLives=0;
-	private bool FirstWarnUseOfAttackFb=false;
+	private float lastAct=-1;
+	private UnitInspect potentialEnemy;
 	public override void InitializeAgent() {
 		sys = GameObject.FindObjectOfType<GameSystem>();
 		PlannedObs = sys.initKnightNumber + sys.initEnemyNumber;
@@ -64,6 +65,7 @@ public class AgentScript : Agent
 		area = GameObject.FindObjectOfType<WalkArea>();
 		inspector = new UnitInspect();
 		lastLives=lives;
+		potentialEnemy = new UnitInspect();
 	}
     public override void AgentReset() {
 		print("NewEpisode");
@@ -120,7 +122,7 @@ public class AgentScript : Agent
 						}
 						continue;
 					}
-					Debug.LogError("Unknown game object tagged as knight and it observated.");
+					Debug.LogError("Unknown game object tagged as enemy and it observated.");
 					AddVectorObs(0);
 					AddVectorObs(0);
 					continue;
@@ -139,23 +141,25 @@ public class AgentScript : Agent
     {
 		if (!dead && this.enabled) {
 			float angle = act[0]*360f*Mathf.Deg2Rad;
-			float force = Mathf.Clamp(act[1], -1, 1) * vector_offset;
+			float force = Mathf.Clamp(act[1], -1, 1);
 			Vector3 controlSignal = new Vector3(Mathf.Cos(angle),0,Mathf.Sin(angle));
 			controlSignal.Normalize();
-			controlSignal*=force;
+			controlSignal *= force*vector_offset;
 
 			agent.isStopped = false;	
 			agent.destination = transform.position + controlSignal;
-			DecideAttack(act);
+			DecideAttack(act[2]);
+			lastAct=act[2];
 			AddReward(-0.3f);
 		} else {
+			Debug.LogWarning("Agent remained after dead.");
 			agent.isStopped = true;
 			SetReward(-0.03f);
 		}
 			
     }
-	public virtual void AgentAlwaysUpdate() {
-		//Always attack check
+	public void AgentAlwaysUpdateInternal() {
+		//Always attack check, update health bar and minus reward when it recieves damage, also animation
 		if(!dead && this.enabled) {
 			if(lives != startLives){
 				//only use the healthbar when the character lost some lives
@@ -182,57 +186,75 @@ public class AgentScript : Agent
 			if(agent.stoppingDistance != defaultStoppingDistance)
 				agent.stoppingDistance = defaultStoppingDistance;
 
-			DecideAttack(null);
-		}
-	}
-	public virtual bool DecideAttack(float[] act) {
-		if(!FirstWarnUseOfAttackFb) {
-			Debug.LogWarning("No attack method implemented, use fallback method");
-			FirstWarnUseOfAttackFb=true;
-		}
-		bool attacking=false;
-		UnitInspect potentialEnemy = new UnitInspect();
-		float maxDistance=Mathf.Infinity;
-		foreach(GameObject enemy in GameObject.FindGameObjectsWithTag("Enemy")) {
-			potentialEnemy.setScriptsFrom(enemy);
-			if(!potentialEnemy.isDead()) {
-				float distanceToTarget = Vector3.Distance(this.transform.localPosition, enemy.transform.localPosition);
-				if(distanceToTarget<= agent.stoppingDistance) {
-					maxDistance=(distanceToTarget>maxDistance)?distanceToTarget:maxDistance;
-
-					Vector3 currentTargetPosition = enemy.transform.position;
-					currentTargetPosition.y = transform.position.y;
-					transform.LookAt(currentTargetPosition);
-					animator.SetBool("Attacking", true);
-					
-					//play the attack audio
-					if(source.clip != attackAudio){
-						source.clip = attackAudio;
-						source.Play();
-					}
-					
-					potentialEnemy.setLives(potentialEnemy.getLives()-(Time.deltaTime * damage));
-					attacking=true;
-					if(potentialEnemy.getLives()<0) {
-						print("dead!!");
-						AddReward(1f);
-					} else {
-						AddReward(0.5f);
-					}
+			bool attacking = DecideAttack(lastAct);
+			Monitor.Log("IsAttacking", (attacking)?1:0,this.transform);
+			if(animator.GetBool("Attacking") && !attacking){
+				animator.SetBool("Attacking", false);
+				
+				//play the running audio
+				if(source.clip != runAudio){
+					source.clip = runAudio;
+					source.Play();
 				}
 			}
-		}
-		Monitor.Log("IsAttacking", (attacking)?1:0,this.transform);
-		if(animator.GetBool("Attacking") && !attacking){
-			animator.SetBool("Attacking", false);
-			
-			//play the running audio
-			if(source.clip != runAudio){
-				source.clip = runAudio;
-				source.Play();
+			if(!animator.GetBool("Attacking") && attacking) {
+				animator.SetBool("Attacking", true);
+				//play the attack audio
+				if(source.clip != attackAudio){
+					source.clip = attackAudio;
+					source.Play();
+				}
 			}
+			AddReward(-0.3f);
 		}
-		return attacking;
+	}
+	public virtual void AgentAlwaysUpdate() {
+		//use it when we need to reward additional situation 
+	}
+	public virtual bool DecideAttack(float? act) {
+		//act will indicates special ability
+		if(!sys.FirstWarnUseOfAttackFb) {
+			Debug.LogWarning("No attack method implemented, use fallback method");
+			sys.FirstWarnUseOfAttackFb=true;
+		}
+		bool attacking=false;
+        if(act!=null) {
+            if(act>=0) {
+                float minDistance=Mathf.Infinity;
+                GameObject minUnit=new GameObject();
+                foreach(GameObject enemy in GameObject.FindGameObjectsWithTag("Enemy")) {
+                    inspector.setScriptsFrom(enemy);
+                    if(!inspector.isDead()) {
+                        float distanceToTarget = Vector3.Distance(this.transform.localPosition, enemy.transform.localPosition);
+                        if(distanceToTarget<= agent.stoppingDistance) {
+                            minUnit=(distanceToTarget<minDistance)?enemy:minUnit;
+                            minDistance=(distanceToTarget<minDistance)?distanceToTarget:minDistance;
+                        }
+                    }
+                }
+                if(minUnit.CompareTag("Enemy") || minUnit.CompareTag("Knight")) {
+                    Vector3 currentTargetPosition = minUnit.transform.position;
+                    currentTargetPosition.y = transform.position.y;
+                    transform.LookAt(currentTargetPosition);
+                    if(inspector.setScriptsFrom(minUnit)) {
+                        inspector.setLives(inspector.getLives()-(Time.deltaTime * damage));
+                        attacking=true;
+                        if(inspector.getLives()<0) {
+                            print("Damaged opponent dead");
+                            AddReward(1f);
+                        } else {
+                            AddReward(0.5f);
+                        }
+                    } else {
+                        Debug.LogError("Invalid unit targetted.");
+                    }
+                    
+                }
+            } else {
+
+            }
+        }
+        return attacking;
 	}
 	public void AgentDescisionRequest() {
 		if(dead || gameObject==null || !sys.battleStarted) return;
@@ -241,8 +263,8 @@ public class AgentScript : Agent
 		} else {
 			if(!dead && this.enabled) {
 				//Moving towards to destination
-				
 			} else {
+				Debug.LogWarning("Agent Descision Request triggered after its death");
 				SetReward(-0.03f);
 			}
 		}
@@ -252,12 +274,11 @@ public class AgentScript : Agent
 		Done();
 	}
 	public override void AgentOnDone() {
-		//Theory : if agent still remains after the destroying, Destroy log triggers two times more after episode ends because ending an episode triggers each agent's done function.
+		//if agent still remains after the destroying, Destroy log triggers two times more after episode ends because ending an episode triggers each agent's done function.
 		dead=true;
 		//create the ragdoll at the current position
 		try {
 			Instantiate(ragdoll, transform.position, transform.rotation);
-			//transform.position = new Vector3(999, 999, 999);
 		} catch {
 			Debug.LogWarning("Error on placing deadbody. You probably unsigned the ragdoll from editor manually.");
 		}

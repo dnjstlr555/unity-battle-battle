@@ -10,11 +10,11 @@ public class MyAcademy : Academy
     private UnitInspect inspector;
     private bool firstResetPassed = false;
     public override void InitializeAcademy() {
-        Monitor.SetActive(true);
+        //Monitor.SetActive(true);
 
         sys=FindObjectOfType<GameSystem>();
         enemysys=FindObjectOfType<EnemyArmy>();
-        inspector=new UnitInspect();
+        inspector=new UnitInspect(sys);
 
         sys.Academy_Initialize();
         enemysys.Academy_Initialize();
@@ -22,13 +22,13 @@ public class MyAcademy : Academy
     public override void AcademyReset() {
         print("Resetting Academy");
         if(firstResetPassed) {
-            List<GameObject> units=inspector.getCurrentUnits();
+            GameObject[] units=inspector.getCurrentUnits();
             foreach(GameObject unit in units) {
                 if(inspector.setScriptsFrom(unit)) {
-                    if(inspector.getType()=="Unit") {
+                    if(inspector.getScriptType()=="Unit") {
                         Destroy(unit);
                         Debug.Log("an unit remained. destroying");
-                    } else if(inspector.getType()=="AgentScript") {
+                    } else if(inspector.getScriptType()=="AgentScript") {
                         Debug.LogError("an Agent unit remained after episode finishes.");
                     }
                 }
@@ -36,18 +36,18 @@ public class MyAcademy : Academy
             enemysys.initEnemies();
         }
         firstResetPassed=true;
-        sys.Academy_Awake();
-        sys.Academy_Start();
+        sys.Academy_Awake(); //Init knights, enemys
         enemysys.Academy_Start();
-        sys.startBattle();
+        sys.Academy_Start();
+        sys.startBattle(); //Asign knights, enemys
     }
 
     public override void AcademyStep() {
         if(!IsDone()) {
-            List<GameObject> units=inspector.getCurrentUnits();
+            GameObject[] units=inspector.getCurrentUnits();
             foreach(GameObject unit in units) {
                 if(inspector.setScriptsFrom(unit)) {
-                    if(inspector.getType()=="AgentScript" && !inspector.isDead()) {
+                    if(inspector.getScriptType()=="AgentScript" && !inspector.isDead()) {
                         inspector.AgentDescisionRequest();
                         inspector.AgentAlwaysUpdate();
                     }
@@ -58,8 +58,8 @@ public class MyAcademy : Academy
             if(sys.battleStarted && (sys.knightNumber<=0 || sys.enemyNumber<=0)) {
                 print("Episode Ended");
                 Debug.Log(((sys.knightNumber<=0)?"Knight Eliminated ":"Knight Win ")+inspector.AvgLives(inspector.getCurrentKnights()).ToString()+" "+inspector.AvgLives(inspector.getCurrentEnemys()).ToString());
-                Monitor.Log("LastAvgLivesOfKnight", inspector.AvgLives(inspector.getCurrentKnights()), this.transform);
-                Monitor.Log("LastAvgLivesOfEnemy", inspector.AvgLives(inspector.getCurrentEnemys()), this.transform);
+                //Monitor.Log("LastAvgLivesOfKnight", inspector.AvgLives(inspector.getCurrentKnights()), this.transform);
+                //Monitor.Log("LastAvgLivesOfEnemy", inspector.AvgLives(inspector.getCurrentEnemys()), this.transform);
                 
                 EndEpisode();
             }
@@ -68,6 +68,7 @@ public class MyAcademy : Academy
     void EndEpisode() {
         sys.battleStarted=false;
         foreach(GameObject corpe in GameObject.FindGameObjectsWithTag("Ragdoll")) {
+            print("delete copre");
             corpe.GetComponent<DeleteParticles>().DestroyMe();
         }
         Done();

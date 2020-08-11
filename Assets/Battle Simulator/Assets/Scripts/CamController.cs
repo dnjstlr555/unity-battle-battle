@@ -34,7 +34,7 @@ public class CamController : MonoBehaviour {
     }
 	
 	void Update(){
-		inspector = new UnitInspect();
+		inspector = new UnitInspect(characterPlacer);
 		
 		//don't use time.deltatime if the timescale is 0
 		if(Time.timeScale == 0){
@@ -72,7 +72,7 @@ public class CamController : MonoBehaviour {
 		transform.Translate(new Vector3(0, 0, Input.GetAxis("Mouse ScrollWheel")) * zoomSpeed * timescale);
 		AvailableStick.Clear();
 		if(characterPlacer.knightNumber>=1 || characterPlacer.enemyNumber>=1) {
-			Units=inspector.getCurrentUnits().ToArray();
+			Units=inspector.getCurrentUnits();
 			for(int i=0;i<Units.Length;i++) {
 				if(inspector.setScriptsFrom(Units[i]) && !inspector.isDead()) {
 					AvailableStick.Add(i);

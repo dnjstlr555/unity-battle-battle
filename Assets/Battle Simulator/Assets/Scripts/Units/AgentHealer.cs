@@ -4,7 +4,6 @@ using UnityEngine;
 
 public class AgentHealer : AgentScript
 {   
-    private UnitInspect inspector=new UnitInspect();
     public override void AgentAlwaysUpdate() {
         
     }

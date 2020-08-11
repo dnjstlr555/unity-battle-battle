@@ -4,16 +4,16 @@ using UnityEngine;
 
 public class AgentKnight : AgentScript
 {
-    private UnitInspect inspector=new UnitInspect();
     public override bool DecideAttack(float? act) {
-        bool attacking=false;
+		//act will indicates special ability
+		bool attacking=false;
         if(act!=null) {
             if(act>=0) {
+				//placeholder, since new gameobject makes useless game object and it slows entire game
                 float minDistance=Mathf.Infinity;
-                GameObject minUnit=new GameObject();
-                foreach(GameObject enemy in GameObject.FindGameObjectsWithTag("Enemy")) {
-                    inspector.setScriptsFrom(enemy);
-                    if(!inspector.isDead()) {
+				GameObject minUnit=sys.EmptyUnit;
+                foreach(GameObject enemy in inspector.getCurrentEnemys()) {
+                    if(inspector.setScriptsFrom(enemy) && !inspector.isDead()) {
                         float distanceToTarget = Vector3.Distance(this.transform.localPosition, enemy.transform.localPosition);
                         if(distanceToTarget<= agent.stoppingDistance) {
                             minUnit=(distanceToTarget<minDistance)?enemy:minUnit;
@@ -44,5 +44,5 @@ public class AgentKnight : AgentScript
             }
         }
         return attacking;
-    }
+	}
 }

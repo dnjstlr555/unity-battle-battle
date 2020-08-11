@@ -46,6 +46,7 @@ public class GameSystem : MonoBehaviour {
 	[Space(5)]
 	public Dropdown speedSetting;
 	public int initEnemyNumber, initKnightNumber; 
+	//public GameObject indicator;
 	
 	[Space(5)]
 
@@ -60,16 +61,18 @@ public class GameSystem : MonoBehaviour {
 	[HideInInspector] public bool battleStarted;
 	[HideInInspector] public int enemyNumber, knightNumber;
 	[HideInInspector] public bool FirstWarnUseOfAttackFb=false;
+	[HideInInspector] public float Timer=0;
+	[HideInInspector] public GameObject EmptyUnit;
+	[HideInInspector] public GameObject[] knightUnits;
+	[HideInInspector] public GameObject[] enemyUnits;
 	private bool erasing;
 	private int coins;
 	private bool erasingUsingKey;
 	private LevelData levelData;
 	private bool characterStats;
 	private Vector3 gridCenter;
-	private GameObject border;
 	private int gridSize;
-	private UnitInspect inspector = new UnitInspect();
-
+	private UnitInspect inspector;
 	public void Academy_Initialize() {
 		print("Initializing Game System");
 		levelData = Resources.Load("Level data") as LevelData;
@@ -93,13 +96,19 @@ public class GameSystem : MonoBehaviour {
 		//enables minimap
 		topDownMapPanel.SetActive(true);
 		leftPanelAnimator.SetBool("hide instant", true);
-		
+
+		EmptyUnit=new GameObject();
+		EmptyUnit.transform.parent = this.gameObject.transform;
+		inspector = new UnitInspect(this);
 	}
 	public void Academy_Awake() {
 		knightNumber=0;
 		enemyNumber=0;
+		knightUnits.Initialize();
+		enemyUnits.Initialize();
 		battleStarted=false;
 		placedUnits.Clear();
+
 	}
 	public void Academy_Start() {
 		Academy_Spawn();
@@ -115,14 +124,15 @@ public class GameSystem : MonoBehaviour {
 		if(battleStarted){
 			knightNumber=0;
 			enemyNumber=0;
-			List<GameObject> Units = inspector.getCurrentUnits();
+			GameObject[] Units = inspector.getCurrentUnits();
 			foreach(GameObject unit in Units) {
 				if(inspector.setScriptsFrom(unit) && !inspector.isDead() && inspector.getLives()<0) {
 					inspector.setDead();
+					if(inspector.getScriptType()=="unit") inspector.removeFrom(unit);
 				}
 			}
-			GameObject[] Knights = GameObject.FindGameObjectsWithTag("Knight");
-			GameObject[] Enemies = GameObject.FindGameObjectsWithTag("Enemy");
+			GameObject[] Knights = inspector.getCurrentKnights();
+			GameObject[] Enemies = inspector.getCurrentEnemys();
 			for(int i=0;i<Knights.Length;i++) {
 				if(inspector.setScriptsFrom(Knights[i]) && !inspector.isDead()) {
 					knightNumber+=1;
@@ -150,10 +160,10 @@ public class GameSystem : MonoBehaviour {
 					battleIndicator.fillAmount = fill;
 			}
 		}
-		else if(GameObject.FindGameObjectsWithTag("Knight").Length == 0){
+		else if(knightNumber == 0){
 			battleIndicator.fillAmount -= Time.deltaTime * 0.5f;
 		}
-		else if(GameObject.FindGameObjectsWithTag("Enemy").Length == 0){
+		else if(enemyNumber == 0){
 			battleIndicator.fillAmount += Time.deltaTime * 0.5f;
 		}
 		
@@ -172,13 +182,11 @@ public class GameSystem : MonoBehaviour {
 			print("Coudln't start battle beacuse the enemy didn't spawn");
 			return;
 		}
+		knightUnits=GameObject.FindGameObjectsWithTag("Knight");
+		enemyUnits=GameObject.FindGameObjectsWithTag("Enemy");
 		//show the new UI
 		StartCoroutine(battleUI());
 		battleStarted = true;
-		
-		//destroy the border object
-		if(border != null)
-			Destroy(border);
 	}
 	
 	//check if the position is within the 3D grid
@@ -196,8 +204,8 @@ public class GameSystem : MonoBehaviour {
 	
 	//calculate the battle status by comparing the number of enemies vs the number of allies
 	float BattleStatus(){
-		int knightsLeft = GameObject.FindGameObjectsWithTag("Knight").Length;
-		int enemiesLeft = GameObject.FindGameObjectsWithTag("Enemy").Length;
+		int knightsLeft = this.knightNumber;
+		int enemiesLeft = this.enemyNumber;
 		int total = knightsLeft + enemiesLeft;
 		
 		return (float)knightsLeft/(float)total;
@@ -278,12 +286,12 @@ public class GameSystem : MonoBehaviour {
 	//get all units in range of a certain position
 	public GameObject unitsInRange(Vector3 position){
 		//store the units in an array
-		Unit[] allUnits = GameObject.FindObjectsOfType<Unit>();
+		GameObject[] allUnits = inspector.getInstantiatedUnits();
 		
 		//foreach unit, check if it's in range and return as soon as one of them is
-		foreach(Unit unit in allUnits){
-			if(Vector3.Distance(unit.gameObject.transform.position, position) < levelData.checkRange && unit.gameObject != currentDemoCharacter)
-				return unit.gameObject;
+		foreach(GameObject unit in allUnits){
+			if(Vector3.Distance(unit.transform.position, position) < levelData.checkRange && unit.gameObject != currentDemoCharacter)
+				return unit;
 		}
 		
 		//after checking all units, return null
@@ -498,7 +506,7 @@ public class GameSystem : MonoBehaviour {
 		if(inspector.setScriptsFrom(unit)) {
 			inspector.setEnable(true);
 		}
-		if(inspector.getType()=="AgentScript") {
+		if(inspector.getScriptType()=="AgentScript") {
 			inspector.setInitAgent(brain);
 		}
 		if(unit.GetComponent<Archer>())
@@ -597,5 +605,8 @@ public class GameSystem : MonoBehaviour {
 		yield return new WaitForSeconds(0.5f);
 		//show the game panel
 		gamePanel.SetBool("show", true);
+	}
+	private void Update() {
+		Timer+=Time.deltaTime;
 	}
 }

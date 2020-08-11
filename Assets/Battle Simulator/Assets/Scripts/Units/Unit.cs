@@ -40,6 +40,7 @@ public class Unit : MonoBehaviour {
 	
 	private GameSystem Academy;
 	public bool dead;
+	private UnitInspect inspector;
 	
 	void Start(){
 		//if this an archer or enemy, don't use the spread option
@@ -72,6 +73,7 @@ public class Unit : MonoBehaviour {
 		
 		//find the area so the character can walk around
 		area = GameObject.FindObjectOfType<WalkArea>();
+		inspector = new UnitInspect(Academy);
 	}
 	
 	void FixedUpdate(){
@@ -92,15 +94,15 @@ public class Unit : MonoBehaviour {
 		
 		//if character ran out of lives, it should die
 		if(lives < 0 && !dead)
-			StartCoroutine(die());
-		
+			die();
+		/*
 		//play dusteffect when running and stop it when the character is not running
 		if(dustEffect && animator.GetBool("Attacking") == false && !dustEffect.isPlaying)
 			dustEffect.Play();
 
 		if(dustEffect && dustEffect.isPlaying && animator.GetBool("Attacking") == true)
 			dustEffect.Stop();
-		
+		*/
 		//randomly walk across the battlefield if there's no targets left
 		//ML:relating to moves
 		if(currentTarget == null || currentTarget.GetComponent<AgentScript>().dead){
@@ -121,13 +123,15 @@ public class Unit : MonoBehaviour {
 				Vector3 currentTargetPosition = currentTarget.position;
 				currentTargetPosition.y = transform.position.y;
 				transform.LookAt(currentTargetPosition);
-				animator.SetBool("Attacking", true);
 				
+				animator.SetBool("Attacking", true);
+				/*
 				//play the attack audio
 				if(source.clip != attackAudio){
 					source.clip = attackAudio;
 					source.Play();
 				}
+				*/
 				
 				if(currentTarget.gameObject.GetComponent<AgentScript>()) {
 					currentTarget.gameObject.GetComponent<AgentScript>().lives -= Time.deltaTime * damage;
@@ -136,18 +140,20 @@ public class Unit : MonoBehaviour {
 				} else {
 					
 				}
+				
 				//apply damage to the enemy
 			}
-				
+			
 			//if its still traveling to the target, play running animation
 			if(animator.GetBool("Attacking") && Vector3.Distance(currentTarget.position, transform.position) > agent.stoppingDistance){
 				animator.SetBool("Attacking", false);
-				
+				/*
 				//play the running audio
 				if(source.clip != runAudio){
 					source.clip = runAudio;
 					source.Play();
 				}
+				*/
 			}
 		}
 		//ML:relating to moves
@@ -187,7 +193,7 @@ public class Unit : MonoBehaviour {
 	
 	public Transform findCurrentTarget(){  
 		//find all potential targets (enemies of this character)
-		GameObject[] enemies = GameObject.FindGameObjectsWithTag(attackTag);
+		GameObject[] enemies = inspector.getUnitsByTag(attackTag);
 		Transform target = null;
 		
 		//if we want this character to communicate with his allies
@@ -261,7 +267,7 @@ public class Unit : MonoBehaviour {
 		int numberOfUnitsAttackingThisEnemy = 0;
 		
 		//foreach ally that's attacking the same enemy, increase the number of allies
-		foreach(GameObject ally in GameObject.FindGameObjectsWithTag(gameObject.tag)){
+		foreach(GameObject ally in inspector.getUnitsByTag(gameObject.tag)){
 			if(ally.GetComponent<Unit>().currentTarget == target && !ally.GetComponent<Archer>())
 				numberOfUnitsAttackingThisEnemy++;
 		}
@@ -296,14 +302,16 @@ public class Unit : MonoBehaviour {
 		return Vector3.zero;
 	}
 	
-	public IEnumerator die(){
-		dead = true;
+	public void die(){
+		
 		
 		//create the ragdoll at the current position
-		Instantiate(ragdoll, transform.position, transform.rotation);
+		if(!dead) Instantiate(ragdoll, transform.position, transform.rotation);
 		
-		//wait a moment and destroy the original unit
-		yield return new WaitForEndOfFrame();
+		dead = true;
 		Destroy(gameObject);
+		//wait a moment and destroy the original unit
+		return;
+		
 	}
 }

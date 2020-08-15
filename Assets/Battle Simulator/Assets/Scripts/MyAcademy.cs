@@ -8,42 +8,50 @@ public class MyAcademy : Academy
     private GameSystem sys;
     private EnemyArmy enemysys;
     private UnitInspect inspector;
-    private bool firstResetPassed = false;
+    private bool once=false;
+    private bool onceInStep=false;
     public override void InitializeAcademy() {
         //Monitor.SetActive(true);
 
         sys=FindObjectOfType<GameSystem>();
         enemysys=FindObjectOfType<EnemyArmy>();
         inspector=new UnitInspect(sys);
+        inspector.cam=FindObjectOfType<CamController>();
 
         sys.Academy_Initialize();
         enemysys.Academy_Initialize();
     }
     public override void AcademyReset() {
-        print("Resetting Academy");
-        if(firstResetPassed) {
-            GameObject[] units=inspector.getCurrentUnits();
-            foreach(GameObject unit in units) {
-                if(inspector.setScriptsFrom(unit)) {
-                    if(inspector.getScriptType()=="Unit") {
-                        Destroy(unit);
-                        Debug.Log("an unit remained. destroying");
-                    } else if(inspector.getScriptType()=="AgentScript") {
-                        Debug.LogError("an Agent unit remained after episode finishes.");
-                    }
-                }
-            }
-            enemysys.initEnemies();
+        if(once) {
+            EndEpisode();
         }
-        firstResetPassed=true;
-        sys.Academy_Awake(); //Init knights, enemys
+        once=true;
+        print("Resetting Academy");
+        sys.Academy_Awake(); 
         enemysys.Academy_Start();
         sys.Academy_Start();
         sys.startBattle(); //Asign knights, enemys
+        onceInStep=false;
     }
-
+    void EndEpisode() {
+        Debug.Log(((sys.knightNumber<=0)?"Knight Eliminated ":"Knight Win ")+inspector.AvgLives(inspector.getCurrentKnights()).ToString()+" "+inspector.AvgLives(inspector.getCurrentEnemys()).ToString());
+        inspector.printOnPanel($"Knight {((inspector.getCurrentKnights().Length<=0)?"Lose":"Win")}");
+        sys.battleStarted=false;
+        System.Array.Resize(ref sys.knightUnits,0);
+        System.Array.Resize(ref sys.enemyUnits,0);
+        foreach(GameObject unit in inspector.getInstantiatedUnits()) {
+            if(inspector.setScriptsFrom(unit) && inspector.getScriptType()=="Unit") {
+                Destroy(unit);
+            } else if(inspector.getScriptType()=="AgentScript") {
+                Debug.LogError("An agent remained after episode ended");
+            }
+        }
+        foreach(GameObject corpe in GameObject.FindGameObjectsWithTag("Ragdoll")) {
+            corpe.GetComponent<DeleteParticles>().DestroyMe();
+        }
+    }
     public override void AcademyStep() {
-        if(!IsDone()) {
+        if(!IsDone() && sys.battleStarted) {
             GameObject[] units=inspector.getCurrentUnits();
             foreach(GameObject unit in units) {
                 if(inspector.setScriptsFrom(unit)) {
@@ -55,22 +63,25 @@ public class MyAcademy : Academy
             }
             //Enviromental Upadte
             sys.Academy_Update();
-            if(sys.battleStarted && (sys.knightNumber<=0 || sys.enemyNumber<=0)) {
-                print("Episode Ended");
-                Debug.Log(((sys.knightNumber<=0)?"Knight Eliminated ":"Knight Win ")+inspector.AvgLives(inspector.getCurrentKnights()).ToString()+" "+inspector.AvgLives(inspector.getCurrentEnemys()).ToString());
-                //Monitor.Log("LastAvgLivesOfKnight", inspector.AvgLives(inspector.getCurrentKnights()), this.transform);
-                //Monitor.Log("LastAvgLivesOfEnemy", inspector.AvgLives(inspector.getCurrentEnemys()), this.transform);
-                
-                EndEpisode();
+            if((sys.knightNumber<=0 || sys.enemyNumber<=0) && !onceInStep) {
+                print("Processing battle end inside of academystep");
+                GameObject[] Remained=inspector.getCurrentUnits();
+                foreach(GameObject unit in Remained) {
+                    if(inspector.setScriptsFrom(unit)) {
+                        if(inspector.getScriptType()=="Unit") {
+                            inspector.removeFrom(unit);
+                            Destroy(unit);
+                            Debug.Log("an unit remained. destroying");
+                        } else if(inspector.getScriptType()=="AgentScript") {
+                            Debug.Log("Agent Remained, rewarding");
+                            inspector.AgentSetReward(1f);
+                            inspector.AgentDone();
+                        }
+                    }
+                }
+                onceInStep=true;
+                Done();
             }
         }
-    }
-    void EndEpisode() {
-        sys.battleStarted=false;
-        foreach(GameObject corpe in GameObject.FindGameObjectsWithTag("Ragdoll")) {
-            print("delete copre");
-            corpe.GetComponent<DeleteParticles>().DestroyMe();
-        }
-        Done();
     }
 }

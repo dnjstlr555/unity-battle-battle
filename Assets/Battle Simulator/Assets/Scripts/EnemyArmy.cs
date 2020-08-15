@@ -7,15 +7,16 @@ public class EnemyArmy : MonoBehaviour {
 	public bool IsEnemyAllPlaced = false;
 	//not visible in the inspector
 	private LevelData levelData;
-	private List<GameObject> spawnedEnemies = new List<GameObject>();
 	private GameSystem characterPlacement;
 	private int level;
+	private UnitInspect inspector;
 	public void Academy_Initialize() {
 		print("Initializing Enemy System");
 		characterPlacement = GameObject.FindObjectOfType<GameSystem>();
 
 		levelData = Resources.Load("Level data") as LevelData;
 		level = PlayerPrefs.GetInt("level");
+		inspector=new UnitInspect(characterPlacement);
 	}
 	public void Academy_Start () {
 		print("Enemy army spawning");
@@ -64,23 +65,12 @@ public class EnemyArmy : MonoBehaviour {
 		if(Physics.Raycast(position, -Vector3.up, out hit)){
 			//if the raycast hits a terrain, spawn a unit at the hit point
 			GameObject newUnit = Instantiate(unit, hit.point, Quaternion.Euler(0, 90, 0));
-			spawnedEnemies.Add(newUnit);
-			
-			//disable the unit until the battle starts
-			//characterPlacement.disableUnit(newUnit);
-		}
-	}
-	
-	public void startEnemies(){
-		//enable all enemies so they start the battle
-		foreach(GameObject enemyUnit in spawnedEnemies){
-			characterPlacement.enableUnit(enemyUnit);
+			inspector.addFrom(newUnit);
 		}
 	}
 	public void initEnemies(){
 		foreach(GameObject enemyUnit in GameObject.FindGameObjectsWithTag("Enemy")){
 			Destroy(enemyUnit);
 		}
-		spawnedEnemies.Clear();
 	}
 }

@@ -18,10 +18,11 @@ public class CamController : MonoBehaviour {
 	
 	private GameSystem characterPlacer;
 	private int Sticky = 0;
-	private GameObject[] Units;
+	private int StickyKey = int.MinValue;
+	private Dictionary<int,GameObject> Units= new Dictionary<int, GameObject>();
 	private GameObject thatKnight;
 	private UnitInspect inspector;
-	List<int> AvailableStick = new List<int>();
+	private DebugInfo DebugInner;
     void Start(){
 		//get start rotation
 		Vector3 rot = transform.localRotation.eulerAngles;
@@ -30,12 +31,18 @@ public class CamController : MonoBehaviour {
 		
 		//find the character placer
 		characterPlacer = GameObject.FindObjectOfType<GameSystem>();
-		
+		inspector = new UnitInspect(characterPlacer);
+		DebugInner = new DebugInfo(inspector);
     }
 	
 	void Update(){
-		inspector = new UnitInspect(characterPlacer);
-		
+		DebugInner.printUpdate();
+		Units = new Dictionary<int, GameObject>();
+		foreach(GameObject unit in inspector.getCurrentUnits()) {
+			Units.Add(unit.GetInstanceID(), unit);
+		}
+		int[] keys = new int[Units.Keys.Count];
+		Units.Keys.CopyTo(keys,0);
 		//don't use time.deltatime if the timescale is 0
 		if(Time.timeScale == 0){
 			timescale = (1f/30f);
@@ -46,12 +53,22 @@ public class CamController : MonoBehaviour {
 		
 		//if key gets pressed move left/right
 		if(Input.GetKeyDown("a")){
-		//transform.Translate(Vector3.right * -movespeed * timescale);
-		Sticky-=1;
+			//transform.Translate(Vector3.right * -movespeed * timescale);
+			if(keys.Length>0) {
+				Sticky-=1;
+				if(Sticky>=keys.Length) Sticky=0;
+				if(Sticky<0) Sticky=keys.Length-1;
+				StickyKey=keys[Sticky];
+			}
 		}
 		if(Input.GetKeyDown("d")){
-		//transform.Translate(Vector3.right * movespeed * timescale);
-		Sticky+=1;
+			//transform.Translate(Vector3.right * movespeed * timescale);
+			if(keys.Length>0) {
+				Sticky+=1;
+				if(Sticky>=keys.Length) Sticky=0;
+				if(Sticky<0) Sticky=keys.Length-1;
+				StickyKey=keys[Sticky];
+			}
 		}
 	
 		//if key gets pressed move up/down
@@ -70,24 +87,34 @@ public class CamController : MonoBehaviour {
 	
 		//move camera when you scroll
 		transform.Translate(new Vector3(0, 0, Input.GetAxis("Mouse ScrollWheel")) * zoomSpeed * timescale);
-		AvailableStick.Clear();
-		if(characterPlacer.knightNumber>=1 || characterPlacer.enemyNumber>=1) {
-			Units=inspector.getCurrentUnits();
-			for(int i=0;i<Units.Length;i++) {
-				if(inspector.setScriptsFrom(Units[i]) && !inspector.isDead()) {
-					AvailableStick.Add(i);
+		if(characterPlacer.battleStarted && keys.Length>0 && (characterPlacer.knightNumber>=1 || characterPlacer.enemyNumber>=1)) {
+			if(Sticky>keys.Length-1) Sticky=0;
+			if(Sticky<0) Sticky=keys.Length-1;
+			if(!Units.ContainsKey(StickyKey)) {
+				
+				StickyKey=keys[Sticky];
+				Debug.Log($"no ... {StickyKey}");
+			}
+			if(Units.ContainsKey(StickyKey)) {
+				if(inspector.setScriptsFrom(Units[StickyKey]) && !inspector.isDead()) {
+					transform.position = new Vector3(Units[StickyKey].transform.position.x,transform.position.y,Units[StickyKey].transform.position.z);
+					thatKnight=Units[StickyKey];
 				} else {
-					continue;
+					Debug.LogError("Undead caught while controlling cam");
 				}
+				//print($"{Units.Length}/{Sticky}/Front:{((Sticky+1<Units.Length)?Units[Sticky+1].tag:Units[0].tag)}/Current:{Units[Sticky].tag}/Backward:{((Sticky>0)?Units[Sticky-1].tag:Units[Units.Length-1].tag)}");
+			} else {
+				Debug.LogError("It wasn't on the key");
 			}
-			if(Sticky<0) Sticky=AvailableStick.Count-1;
-			if(Sticky>AvailableStick.Count-1) Sticky=0;
-			if(AvailableStick.Contains(Sticky)) {
-				transform.position = new Vector3(Units[AvailableStick[Sticky]].transform.position.x,transform.position.y,Units[AvailableStick[Sticky]].transform.position.z);
-			}
+			
 		}
 	}	
-	
+	public GameObject getStickyUnit() {
+		return thatKnight;
+	}
+	public void printOnPanel(string str) {
+		DebugInner.printOnPanel(str);
+	}
 	void rotateCamera(float mouseX, float mouseY){
 		rotationY += mouseX * mouseSensitivity * timescale;
 		rotationX += mouseY * mouseSensitivity * timescale;

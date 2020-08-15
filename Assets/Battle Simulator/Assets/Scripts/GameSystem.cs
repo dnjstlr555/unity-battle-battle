@@ -42,6 +42,8 @@ public class GameSystem : MonoBehaviour {
 	public Text statsSpeed;
 	public Text coinsText;
 	public Text levelInfo;
+	public Text infoPanel;
+	public Text DebugOutput;
 	
 	[Space(5)]
 	public Dropdown speedSetting;
@@ -57,7 +59,6 @@ public class GameSystem : MonoBehaviour {
 	private int selected;
 	private GameObject currentDemoCharacter;
 	private int rotation = -90;
-	[HideInInspector] public List<GameObject> placedUnits = new List<GameObject>();
 	[HideInInspector] public bool battleStarted;
 	[HideInInspector] public int enemyNumber, knightNumber;
 	[HideInInspector] public bool FirstWarnUseOfAttackFb=false;
@@ -73,6 +74,9 @@ public class GameSystem : MonoBehaviour {
 	private Vector3 gridCenter;
 	private int gridSize;
 	private UnitInspect inspector;
+	private CamController cam;
+	private DebugInfo DebugInner;
+	private MyAcademy AcademyInner;
 	public void Academy_Initialize() {
 		print("Initializing Game System");
 		levelData = Resources.Load("Level data") as LevelData;
@@ -100,25 +104,53 @@ public class GameSystem : MonoBehaviour {
 		EmptyUnit=new GameObject();
 		EmptyUnit.transform.parent = this.gameObject.transform;
 		inspector = new UnitInspect(this);
+		cam=FindObjectOfType<CamController>();
+		inspector.cam=cam;
+		DebugInner= new DebugInfo(inspector);
+		AcademyInner = FindObjectOfType<MyAcademy>();
 	}
 	public void Academy_Awake() {
 		knightNumber=0;
 		enemyNumber=0;
-		knightUnits.Initialize();
-		enemyUnits.Initialize();
 		battleStarted=false;
-		placedUnits.Clear();
-
+		print($"after awake:{knightUnits.Length}/{enemyUnits.Length}");
+		foreach(GameObject d in enemyUnits) {
+			print(d);
+		}
+		DebugInner.printReset();
 	}
 	public void Academy_Start() {
 		Academy_Spawn();
 	}
 	public void Academy_Spawn() {
 		print("Spawning Agents");
-		selected=4;
-		placeAgent(new Vector3(3.2f,0,-9.7f));
-		placeAgent(new Vector3(3.0f,0.0f,2.9f));
-		placeAgent(new Vector3(3.0f,0.0f,9.7f));
+		placeAgent(new Vector3(3.0f,0.0f,-12.7f),4);
+		placeAgent(new Vector3(3.2f,0,-5.7f),4);
+		placeAgent(new Vector3(3.0f,0.0f,2.9f),4);
+		placeAgent(new Vector3(3.0f,0.0f,9.7f),4);
+	}
+	public void placeAgent(Vector3 position, int select) {
+		if(canPlace(position, false)){
+			GameObject AgentObj = Instantiate(troops[select].deployableTroops, position, Quaternion.identity);
+			AgentScript unit = AgentObj.GetComponent<AgentScript>();
+			updateRotation(unit.gameObject);
+			inspector.addFrom(AgentObj);
+		} else {
+			Debug.LogWarning("Couldn't spawn agent for unknown reason");
+		}
+	}
+	public void startBattle(){
+		if(!FindObjectOfType<EnemyArmy>().IsPlaced()) {
+			print("Coudln't start battle beacuse the enemy didn't spawn");
+			return;
+		}
+		//knightUnits=GameObject.FindGameObjectsWithTag("Knight");
+		//enemyUnits=GameObject.FindGameObjectsWithTag("Enemy");
+		print($"Start:{knightUnits.Length}/{enemyUnits.Length}");
+		//show the new UI
+		cam.printOnPanel($"Episode:{AcademyInner.GetEpisodeCount()}");
+		StartCoroutine(battleUI());
+		battleStarted = true;
 	}
 	public void Academy_Update() {
 		if(battleStarted){
@@ -126,21 +158,15 @@ public class GameSystem : MonoBehaviour {
 			enemyNumber=0;
 			GameObject[] Units = inspector.getCurrentUnits();
 			foreach(GameObject unit in Units) {
-				if(inspector.setScriptsFrom(unit) && !inspector.isDead() && inspector.getLives()<0) {
+				if(inspector.setScriptsFrom(unit) && !inspector.isDead() && inspector.getLives()<0 && !inspector.isDoneInProgress()) {
 					inspector.setDead();
-					if(inspector.getScriptType()=="unit") inspector.removeFrom(unit);
 				}
 			}
-			GameObject[] Knights = inspector.getCurrentKnights();
-			GameObject[] Enemies = inspector.getCurrentEnemys();
-			for(int i=0;i<Knights.Length;i++) {
-				if(inspector.setScriptsFrom(Knights[i]) && !inspector.isDead()) {
-					knightNumber+=1;
-				}
-			}
-			for(int i=0;i<Enemies.Length;i++) {
-				if(inspector.setScriptsFrom(Enemies[i]) && !inspector.isDead()) {
-					enemyNumber+=1;
+			GameObject[] UpdatedUnits = inspector.getCurrentUnits();
+			for(int i=0;i<UpdatedUnits.Length;i++) {
+				if(inspector.setScriptsFrom(UpdatedUnits[i]) && !inspector.isDead()) {
+					knightNumber+=(inspector.getTag()=="Knight")?1:0;
+					enemyNumber+=(inspector.getTag()=="Enemy")?1:0;
 				}
 			}
 			//get the current battle status to show in the indicator
@@ -166,34 +192,37 @@ public class GameSystem : MonoBehaviour {
 		else if(enemyNumber == 0){
 			battleIndicator.fillAmount += Time.deltaTime * 0.5f;
 		}
+
+		GameObject nowUnit=cam.getStickyUnit();
+		if(inspector.setScriptsFrom(nowUnit)) {
+			DebugInner.setFromUnit(nowUnit);
+		}
 		
-		//don't update the preview character on mobile devices since it uses the 2d grid	
-		//remove the demo character when hiding the left character panel
-		//clear: mobile, battleStarted, activeSelf	
-		if(battleStarted || !leftPanelAnimator.gameObject.activeSelf){
-			if(currentDemoCharacter)
-				Destroy(currentDemoCharacter);
-			//return so it will not use the demo
-			return;
-		}
+		infoPanel.text = $@"Id:{inspector.InnerObject.GetInstanceID()}
+Hp:{DebugInner.initialLives}/{DebugInner.currentLives}
+Default Damage:{DebugInner.defaultDammage}
+Attack Tag:{DebugInner.attackTag}
+Range:{DebugInner.range}
+Unit Type:{DebugInner.unitType}
+
+Total Damage:{DebugInner.totalDamage}
+Pre Reward:{DebugInner.preReward}
+
+Knight Num:{knightNumber}
+Enemy Num:{enemyNumber}
+Episode:{AcademyInner.GetEpisodeCount()}
+		";
+		
+
 	}
-	public void startBattle(){
-		if(!FindObjectOfType<EnemyArmy>().IsPlaced()) {
-			print("Coudln't start battle beacuse the enemy didn't spawn");
-			return;
-		}
-		knightUnits=GameObject.FindGameObjectsWithTag("Knight");
-		enemyUnits=GameObject.FindGameObjectsWithTag("Enemy");
-		//show the new UI
-		StartCoroutine(battleUI());
-		battleStarted = true;
-	}
+	
 	
 	//check if the position is within the 3D grid
 	bool withinGrid(Vector3 position){
 		//if we're not using any grid, it's inside the grid by default
 		if(!levelData.grid)
 			return true;
+			
 		
 		//else, compare the position to the grid
 		if(position.x > gridCenter.x + gridSize || position.x < gridCenter.x - gridSize || position.z < gridCenter.z - gridSize || position.z > gridCenter.z + gridSize)
@@ -212,14 +241,7 @@ public class GameSystem : MonoBehaviour {
 	}
 	
 	//place a new unit
-	public void placeAgent(Vector3 position) {
-		if(canPlace(position, false)){
-			GameObject AgentObj = Instantiate(troops[selected].deployableTroops, position, Quaternion.identity);
-			AgentScript unit = AgentObj.GetComponent<AgentScript>();
-			updateRotation(unit.gameObject);
-			placedUnits.Add(unit.gameObject);
-		}
-	}
+	
 	//check if the character can be placed at this position
 	bool canPlace(Vector3 position, bool placingGridCell){
 		//check if there's units too close to the current position
@@ -253,24 +275,6 @@ public class GameSystem : MonoBehaviour {
 			return hit.point;
 		
 		return Vector3.zero;
-	}
-	
-	public void eraseUnit(Vector3 position, bool clearing, bool erasingGridCell){
-		//get the unit to erase
-		GameObject unit = unitsInRange(position);
-		
-		//check if the unit exists and if it's not an enemy
-		if(unit != null && unit.name.Length - 7 > 0 && unit.gameObject.tag != "Enemy" && (!EventSystem.current.IsPointerOverGameObject() || clearing || erasingGridCell)){
-			if(!clearing)
-				placedUnits.Remove(unit);
-			
-			//remove the unit
-			Destroy(unit);
-			
-			//give the player back his coins
-			coins += troops[unitIndex(unit)].troopCosts;
-			coinsText.text = coins + "";
-		}
 	}
 	
 	//get the index in the troops list for this unit
@@ -560,17 +564,6 @@ public class GameSystem : MonoBehaviour {
 		//set the panels active if they should be active and turn them off if they should not be active
 		characterStatsPanel.SetActive(!characterStatsPanel.activeSelf);
 		topDownMapPanel.SetActive(!topDownMapPanel.activeSelf);
-	}
-	
-	public void clear(){	
-		//go through all units on the battlefield	
-		for(int i = 0; i < placedUnits.Count; i++){
-			eraseUnit(placedUnits[i].transform.position, true, false);
-		}
-		
-		//clear the unit list and shake the camera
-		placedUnits.Clear();
-		cameraAnimator.SetTrigger("shake");
 	}
 	
 

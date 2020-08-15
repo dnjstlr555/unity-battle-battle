@@ -448,6 +448,9 @@ namespace MLAgents
         public virtual void AcademyStep()
         {
         }
+        public virtual void AcademyPreStep()
+        {
+        }
 
         /// <summary>
         /// Specifies the academy behavior when being reset (i.e. at the completion
@@ -601,7 +604,6 @@ namespace MLAgents
             }
             else if (!firstAcademyReset)
             {
-                print("first academic reset");
                 UpdateResetParameters();
                 ForcedFullReset();
                 firstAcademyReset = true;
@@ -654,6 +656,7 @@ namespace MLAgents
         /// </summary>
         void FixedUpdate()
         {
+            AcademyPreStep();
             EnvironmentStep();
         }
 

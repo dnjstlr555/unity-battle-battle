@@ -14,7 +14,7 @@ public class Unit : MonoBehaviour {
 	public GameObject ragdoll;
 	public AudioClip attackAudio;
 	public AudioClip runAudio;
-	
+	public float RandomRange=1;
 	//not visible in the inspector
 	[HideInInspector]
 	public Transform currentTarget;
@@ -22,12 +22,11 @@ public class Unit : MonoBehaviour {
 	[HideInInspector]
 	public bool spread;
 	
-	private NavMeshAgent agent;
+	[HideInInspector] public NavMeshAgent agent;
 	private GameObject health;
 	private GameObject healthbar;
 	
-	[HideInInspector]
-	private float startLives;
+	[HideInInspector] public float startLives;
 	private float defaultStoppingDistance;
 	private Animator animator;
 	private AudioSource source;
@@ -41,6 +40,7 @@ public class Unit : MonoBehaviour {
 	private GameSystem Academy;
 	public bool dead;
 	private UnitInspect inspector;
+	private System.Random rnd;
 	
 	void Start(){
 		//if this an archer or enemy, don't use the spread option
@@ -74,6 +74,8 @@ public class Unit : MonoBehaviour {
 		//find the area so the character can walk around
 		area = GameObject.FindObjectOfType<WalkArea>();
 		inspector = new UnitInspect(Academy);
+		inspector.cam=FindObjectOfType<CamController>();
+		rnd = new System.Random();
 	}
 	
 	void FixedUpdate(){
@@ -113,37 +115,43 @@ public class Unit : MonoBehaviour {
 			//if there are targets, make sure to use the default stopping distance
 			if(agent.stoppingDistance != defaultStoppingDistance)
 				agent.stoppingDistance = defaultStoppingDistance;
-			
+			if(Vector3.Distance(agent.destination,transform.position)<=agent.stoppingDistance) {
+				agent.isStopped = false;	
+				int sign = rnd.Next(0, 2) * 2 - 1;
+				int sign2 = rnd.Next(0, 2) * 2 - 1;
+				agent.destination = new Vector3(currentTarget.position.x+(float)gausianRand()*RandomRange*sign, currentTarget.position.y, currentTarget.position.z+(float)gausianRand()*RandomRange*sign2);	
+			}
 			//move the agent around and set its destination to the enemy target
-			agent.isStopped = false;	
-			agent.destination = currentTarget.position;	
+			
 		
-			//check if character has reached its target and than rotate towards target and attack it
-			if(Vector3.Distance(currentTarget.position, transform.position) <= agent.stoppingDistance){
-				Vector3 currentTargetPosition = currentTarget.position;
+
+			float minDistance=Mathf.Infinity;
+			GameObject minUnit=Academy.EmptyUnit;
+			foreach(GameObject enemy in inspector.getCurrentKnights()) {
+				inspector.setScriptsFrom(enemy);
+				if(!inspector.isDead()) {
+					float distanceToTarget = Vector3.Distance(this.transform.localPosition, enemy.transform.localPosition);
+					if(distanceToTarget<= agent.stoppingDistance) {
+						minUnit=(distanceToTarget<minDistance)?enemy:minUnit;
+						minDistance=(distanceToTarget<minDistance)?distanceToTarget:minDistance;
+					}
+				}
+			}
+			if(minUnit.CompareTag("Enemy") || minUnit.CompareTag("Knight")) {
+				Vector3 currentTargetPosition = minUnit.transform.position;
 				currentTargetPosition.y = transform.position.y;
 				transform.LookAt(currentTargetPosition);
-				
-				animator.SetBool("Attacking", true);
-				/*
-				//play the attack audio
-				if(source.clip != attackAudio){
-					source.clip = attackAudio;
-					source.Play();
-				}
-				*/
-				
-				if(currentTarget.gameObject.GetComponent<AgentScript>()) {
-					currentTarget.gameObject.GetComponent<AgentScript>().lives -= Time.deltaTime * damage;
-				} else if(currentTarget.gameObject.GetComponent<Unit>()) {
-					currentTarget.gameObject.GetComponent<Unit>().lives -= Time.deltaTime * damage;
+				if(inspector.setScriptsFrom(minUnit)) {
+					inspector.setLives(inspector.getLives()-(Time.deltaTime * damage));
+					animator.SetBool("Attacking", true);
+					if(inspector.getLives()<0) {
+						//print("Damaged agent dead");
+					}
 				} else {
-					
+					Debug.LogError("Invalid unit targetted.");
 				}
 				
-				//apply damage to the enemy
 			}
-			
 			//if its still traveling to the target, play running animation
 			if(animator.GetBool("Attacking") && Vector3.Distance(currentTarget.position, transform.position) > agent.stoppingDistance){
 				animator.SetBool("Attacking", false);
@@ -260,6 +268,16 @@ public class Unit : MonoBehaviour {
 		//otherwise return null
 		return null;
 	}
+	private double gausianRand() {
+		System.Random rand = new System.Random(); //reuse this if you are generating many
+		double u1 = 1.0-rand.NextDouble(); //uniform(0,1] random doubles
+		double u2 = 1.0-rand.NextDouble();
+		double randStdNormal = System.Math.Sqrt(-2.0 * System.Math.Log(u1)) *
+					System.Math.Sin(2.0 * System.Math.PI * u2); //random normal(0,1)
+
+		return randStdNormal;
+		
+	}
 	
 	//check if there's not too much allies attacking this same enemy already
 	public bool canAttack(Transform target){
@@ -309,6 +327,7 @@ public class Unit : MonoBehaviour {
 		if(!dead) Instantiate(ragdoll, transform.position, transform.rotation);
 		
 		dead = true;
+		inspector.removeFrom(this.gameObject);
 		Destroy(gameObject);
 		//wait a moment and destroy the original unit
 		return;

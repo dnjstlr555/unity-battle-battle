@@ -130,7 +130,7 @@ public class Unit : MonoBehaviour {
 				agent.destination = new Vector3(currentTarget.position.x+(float)gausianRand()*RandomRange*sign, currentTarget.position.y, currentTarget.position.z+(float)gausianRand()*RandomRange*sign2);	
 				agent.isStopped = false;
 			}
-			if(isPassedCooltime && (rnd.Next(0, 2) * 2 - 1)>0) {
+			if(isPassedCooltime) { //&& (rnd.Next(0, 2) * 2 - 1)>0) {
 				foreach(GameObject unit in HitboxComponent.GetCollideObjects()) {
 					if(unit==null && !ReferenceEquals(unit, null)) {
 							HitboxComponent.RemoveObject(unit);

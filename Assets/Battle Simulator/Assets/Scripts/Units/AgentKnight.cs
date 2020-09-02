@@ -13,7 +13,7 @@ public class KnightRewardSys : Reward {
         if(unit.AttackCount>0) {
             AddReward(1f);
         } else {
-            AddReward(-0.5f);
+            AddReward(-0.1f);
         }
         unit.AttackCount=0;
     }

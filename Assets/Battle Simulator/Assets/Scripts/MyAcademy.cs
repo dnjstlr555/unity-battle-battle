@@ -3,6 +3,24 @@ using System.Collections.Generic;
 using UnityEngine;
 using MLAgents;
 
+public class AcademyReward : Reward {
+    public override void RewardAtEpisodeEnds(UnitInspect inspector, GameSystem sys) {
+        float AllDamaged=(inspector.getCurrentEnemys().Length<=0)?0:inspector.AvgLives(inspector.getCurrentEnemys());
+        //Rewarding globally
+        foreach(GameObject knight in inspector.getInstantiatedKnights()) {
+            inspector.setScriptsFrom(knight);
+            if(inspector.isScriptValid() && inspector.getScriptType()=="AgentScript") {
+                inspector.AgentAddRewardDirectly((1-((AllDamaged)/sys.AllInitLives))*2f);
+            }
+        }
+        /*
+        //Rewarding reamined units
+        foreach(GameObject knight in inspector.getCurrentKnights()) {
+            inspector.AgentAddRewardDircetly(1f);
+        }
+        */
+    }
+}
 public class MyAcademy : Academy
 {
     private GameSystem sys;
@@ -10,6 +28,7 @@ public class MyAcademy : Academy
     private UnitInspect inspector;
     private bool once=false;
     private bool onceInStep=false;
+    private AcademyReward rewardSys=new AcademyReward();
     public override void InitializeAcademy() {
         //Monitor.SetActive(true);
 
@@ -60,15 +79,7 @@ public class MyAcademy : Academy
             if((sys.knightNumber<=0 || sys.enemyNumber<=0) && !onceInStep) {
                 //On End
                 inspector.printOnPanel($"Knight {((inspector.getCurrentKnights().Length<=0)?"Lose":"Win")} / Knight:{inspector.AvgLives(inspector.getCurrentKnights())} / Enemy:{inspector.AvgLives(inspector.getCurrentEnemys())}");
-                float AllDamaged=(inspector.getCurrentEnemys().Length<=0)?0:inspector.AvgLives(inspector.getCurrentEnemys());
-                //Rewarding globally
-                foreach(GameObject knight in inspector.getInstantiatedKnights()) {
-                    if(inspector.setScriptsFrom(knight) && inspector.getScriptType()=="AgentScript") {
-                        inspector.AgentAddRewardDirectly(1-((AllDamaged-1.8f)/sys.AllInitLives));
-                        Debug.Log($"{AllDamaged}/{sys.AllInitLives}");
-                    }
-                }
-                //Rewarding remained agents
+                rewardSys.RewardAtEpisodeEnds(inspector, sys);
                 GameObject[] Remained=inspector.getCurrentUnits();
                 foreach(GameObject unit in Remained) {
                     if(inspector.setScriptsFrom(unit)) {

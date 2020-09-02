@@ -16,10 +16,8 @@ public class GameSystem : MonoBehaviour {
 	//variables visible in the inspector
 	[Header("Objects:")]
 	public Animator leftPanelAnimator;
-	public Animator endPanel;
 	public Animator buttonsAnimator;
 	public Animator gamePanel;
-	public Animator transition;
 	public Animator cameraAnimator;
 	
 	[Space(5)]
@@ -132,10 +130,10 @@ public class GameSystem : MonoBehaviour {
 	}
 	public void Academy_Spawn() {
 		print("Spawning Agents");
-		placeAgent(new Vector3(3.0f,0.0f,-12.7f),4);
-		placeAgent(new Vector3(3.2f,0,-5.7f),3);
+		//placeAgent(new Vector3(3.0f,0.0f,-12.7f),4);
+		//placeAgent(new Vector3(3.2f,0,-5.7f),4);
 		placeAgent(new Vector3(3.0f,0.0f,2.9f),4);
-		placeAgent(new Vector3(3.0f,0.0f,9.7f),4);
+		//placeAgent(new Vector3(3.0f,0.0f,9.7f),4);
 	}
 	public void placeAgent(Vector3 position, int select) {
 		if(canPlace(position, false)){

@@ -5,7 +5,12 @@ using System.Collections;
 using UnityEngine.UI; 
 using UnityEngine.AI;
 
-//public UnitInspect class located at GameSystem.cs
+public class AgentReward : Reward {
+	//Example, not working
+	public override void RewardAtDie(AgentScript Unit) {
+        AddReward(-1f);
+    }
+}
 
 public class AgentScript : Agent
 {
@@ -18,7 +23,10 @@ public class AgentScript : Agent
 	public AudioClip runAudio;
 	public float maxStopSeconds;
 	public float VectorMagnitude = 10;
-	public float AttackRange=2f;
+	//public float AttackCooltime=3f;
+	public float Deprecated_AttackRange=2f;
+	public ParticleSystem DamagedParticle;
+	public ParticleSystem HealedParticle;
 	
 	[HideInInspector]
 	public NavMeshAgent agent;
@@ -35,7 +43,7 @@ public class AgentScript : Agent
 	
 	private ParticleSystem dustEffect;
 	
-	[HideInInspector] public bool dead;
+	[HideInInspector] public bool dead=false;
 	[HideInInspector] public GameSystem sys;
 	private Vector3 initPosition;
 	[HideInInspector] public UnitInspect inspector;
@@ -47,7 +55,7 @@ public class AgentScript : Agent
 	[HideInInspector] public DebugInfo DebugInner;
 	[HideInInspector] public int test=0;
 	private float lastTime;
-	private bool LastAction=false;
+	private float lastAction=0;
 	public override void InitializeAgent() {
 		innerInitializeAgent();
 		sys = GameObject.FindObjectOfType<GameSystem>();
@@ -153,6 +161,8 @@ public class AgentScript : Agent
 		if (!dead && !IsDone() && sys.battleStarted) {
 			float angle = act[0]*360f*Mathf.Deg2Rad;
 			float force = 1f; //Mathf.Clamp(act[1], 0.1f, 1)-0.1f;
+			lastAction=act[1];
+
 			if(force==0f) lastTime=sys.Timer;
 			Vector3 controlSignal = new Vector3(Mathf.Cos(angle),0,Mathf.Sin(angle));
 			controlSignal.Normalize();
@@ -166,9 +176,9 @@ public class AgentScript : Agent
 				SpecialReward=-2;
 			}
 			InnerRewardAtStep();
-		} else if (LastAction) {
-		}
-		else {
+		} else if(dead) {
+
+		} else {
 			Debug.LogWarning($"{this.GetInstanceID()}:agent remained after {((dead)?"dead":((IsDone())?"done":"battle ended"))}");
 		}
 		test=0;
@@ -187,12 +197,21 @@ public class AgentScript : Agent
 				healthbar.GetComponent<Slider>().value = lives;
 			}
 			if(lives != lastLives) {
+				if(!DamagedParticle.isPlaying) {
+					DamagedParticle.Play();
+					//DamagedParticle.Simulate(Time.unscaledDeltaTime, true, false);
+				}
 				lastLives=lives;
 			}
 			if(agent.stoppingDistance != defaultStoppingDistance)
 				agent.stoppingDistance = defaultStoppingDistance;
 
-			bool attacking = DecideAttack(1);
+			bool attacking = DecideAttack(lastAction);
+			if(attacking) {
+				animator.SetBool("Attacking", true);
+			} else if(animator.GetBool("Attacking")) {
+				animator.SetBool("Attacking", false);
+			}
 		}
 	}
 	public virtual void AgentAlwaysUpdate() {
@@ -213,7 +232,7 @@ public class AgentScript : Agent
                     if(enemy==this.gameObject) continue;
                     if(inspector.setScriptsFrom(enemy) && !inspector.isDead()) {
                         float distanceToTarget = Vector3.Distance(this.transform.localPosition, enemy.transform.localPosition);
-                        if(distanceToTarget<= AttackRange) {
+                        if(distanceToTarget<= Deprecated_AttackRange) {
                             minUnit=(distanceToTarget<minDistance)?enemy:minUnit;
                             minDistance=(distanceToTarget<minDistance)?distanceToTarget:minDistance;
                         }
@@ -266,11 +285,11 @@ public class AgentScript : Agent
 		} catch {
 			Debug.LogWarning("Error on placing deadbody. You probably unsigned the ragdoll from editor manually.");
 		}
-		LastAction=true;
 		dead=true;
-		this.agent.isStopped=true;
+		//Destroy(DamagedParticle.gameObject);
+		agent.isStopped=true;
 		agent.enabled = false;
-		this.gameObject.transform.position=new Vector3(-999,-999,-999);
+		gameObject.transform.position=new Vector3(-999,-999,-999);
 		RequestDecision();
 		inspector.removeFrom(this.gameObject);
 	}

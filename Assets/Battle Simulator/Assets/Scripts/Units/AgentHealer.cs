@@ -23,7 +23,7 @@ public class AgentHealer : AgentScript
                     if(knight==this.gameObject) continue;
                     if(inspector.setScriptsFrom(knight) && !inspector.isDead()) {
                         float distanceToTarget = Vector3.Distance(this.transform.localPosition, knight.transform.localPosition);
-                        if(distanceToTarget<= AttackRange) {
+                        if(distanceToTarget<= Deprecated_AttackRange) {
                             minUnit=(distanceToTarget<minDistance)?knight:minUnit;
                             minDistance=(distanceToTarget<minDistance)?distanceToTarget:minDistance;
                         }

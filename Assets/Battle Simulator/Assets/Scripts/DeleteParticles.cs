@@ -5,7 +5,9 @@ public class DeleteParticles : MonoBehaviour {
 	
 	//float visible in the inspector
 	public float lifetime = 1f;
+	public ParticleSystem DeadParticle;
 	void Start(){
+		DeadParticle.Play();
 		Invoke("DestroyMe", lifetime);
 	}
 	/*

@@ -7,11 +7,11 @@ using UnityEngine.EventSystems;
 public class CamController : MonoBehaviour {
 	
 	//variables not visible in the inspector
-	public static float movespeed;
-	public static float zoomSpeed;
-	public static float mouseSensitivity;
-    public static float clampAngle;
-	
+	public static float movespeed=25f;
+	public static float zoomSpeed=1000f;
+	public static float mouseSensitivity=120f;
+    public static float clampAngle=70f;
+	public Healthbar[] HpBar;
     private float rotationY = 0;
     private float rotationX = 0;
 	
@@ -35,9 +35,13 @@ public class CamController : MonoBehaviour {
 		inspector = new UnitInspect(characterPlacer);
 		DebugInner = new DebugInfo(inspector);
     }
-	
 	void Update(){
-
+		inspector.setScriptsFrom(inspector.getCurrentUnits()[0]);
+		HpBar[0].SetHealth(inspector.getLives());
+		HpBar[0].SetDesc(inspector.getScriptType());
+		inspector.setScriptsFrom(inspector.getCurrentUnits()[1]);
+		HpBar[1].SetHealth(inspector.getLives());
+		HpBar[1].SetDesc(inspector.getScriptType());
 		DebugInner.printUpdate();
 		Units = new Dictionary<int, GameObject>();
 		foreach(GameObject unit in inspector.getCurrentUnits()) {

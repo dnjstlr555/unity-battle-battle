@@ -17,6 +17,7 @@ public class Unit : MonoBehaviour {
 	public Collider Hitbox;
 	public float RandomRange=1;
 	public float AttackRange=2f;
+	public ParticleSystem DamagedParticle;
 	//not visible in the inspector
 	[HideInInspector]
 	public Transform currentTarget;
@@ -35,7 +36,7 @@ public class Unit : MonoBehaviour {
 	
 	private Vector3 randomTarget;
 	private WalkArea area;
-	
+	private float lastLives=0;
 	private ParticleSystem dustEffect;
 	private int maxAlliesPerEnemy;
 	
@@ -44,6 +45,7 @@ public class Unit : MonoBehaviour {
 	private UnitInspect inspector;
 	private System.Random rnd;
 	private HitboxScript HitboxComponent;
+	private bool isPassedCooltime=true;
 	
 	void Start(){
 		//if this an archer or enemy, don't use the spread option
@@ -63,7 +65,7 @@ public class Unit : MonoBehaviour {
 		health = transform.Find("Health").gameObject;
 		healthbar = health.transform.Find("Healthbar").gameObject;
 		health.SetActive(false);	
-	
+		lastLives=lives;
 		//set healtbar value
 		healthbar.GetComponent<Slider>().maxValue = lives;
 		startLives = lives;
@@ -91,6 +93,13 @@ public class Unit : MonoBehaviour {
 			
 			health.transform.LookAt(2 * transform.position - Camera.main.transform.position);
 			healthbar.GetComponent<Slider>().value = lives;
+		}
+		if(lives != lastLives) {
+			if(!DamagedParticle.isPlaying) {
+				DamagedParticle.Play();
+				//DamagedParticle.Simulate(Time.unscaledDeltaTime, true, false);
+			}
+			lastLives=lives;
 		}
 		
 		//find closest enemy
@@ -121,20 +130,25 @@ public class Unit : MonoBehaviour {
 				agent.destination = new Vector3(currentTarget.position.x+(float)gausianRand()*RandomRange*sign, currentTarget.position.y, currentTarget.position.z+(float)gausianRand()*RandomRange*sign2);	
 				agent.isStopped = false;
 			}
-			foreach(GameObject unit in HitboxComponent.GetCollideObjects()) {
-				if(unit==null && !ReferenceEquals(unit, null)) {
-                        HitboxComponent.RemoveObject(unit);
-                        continue;
-				}
-				if(unit.CompareTag("Knight")) {
-					if(inspector.setScriptsFrom(unit) && !inspector.isDead()) {
-						inspector.setLives(inspector.getLives()-(Time.deltaTime * damage));
-						if(inspector.getLives()<0) HitboxComponent.RemoveObject(unit);
-					} else {
-						Debug.LogWarning("Invalid Target Triggered.");
+			if(isPassedCooltime && (rnd.Next(0, 2) * 2 - 1)>0) {
+				foreach(GameObject unit in HitboxComponent.GetCollideObjects()) {
+					if(unit==null && !ReferenceEquals(unit, null)) {
+							HitboxComponent.RemoveObject(unit);
+							continue;
+					}
+					if(unit.CompareTag("Knight")) {
+						if(inspector.setScriptsFrom(unit) && !inspector.isDead()) {
+							inspector.setLives(inspector.getLives()-(damage));
+							if(inspector.getLives()<0) HitboxComponent.RemoveObject(unit);
+						} else {
+							Debug.LogWarning("Invalid Target Triggered.");
+						}
 					}
 				}
+				isPassedCooltime=false;
+				StartCoroutine("Cooltime");
 			}
+			
 
 			/*
 			float minDistance=Mathf.Infinity;
@@ -179,7 +193,10 @@ public class Unit : MonoBehaviour {
 		}
 		//ML:relating to moves
 	}
-	
+	IEnumerator Cooltime() {
+        yield return new WaitForSeconds(1f);
+        isPassedCooltime=true;
+    }
 	//randomly walk around
 	public void walkRandomly(){
 		//check if the area exists

@@ -14,6 +14,30 @@ public class Troop{
 	[HideInInspector]
 	public GameObject button;
 }
+
+public class Reward {
+    Queue<float> bag=new Queue<float>();
+    public Reward() {
+    }
+    public void BagReset() {
+        bag.Clear();
+    }
+    public void AddReward(float r) {
+        bag.Enqueue(r);
+    }
+    public void Apply(AgentScript Agent) {
+        float allReward=0;
+        foreach(float i in bag.ToArray()) {
+            allReward+=i;
+        }
+        Agent.AddReward(allReward);
+        BagReset();
+    }
+    public virtual void RewardAtDie(AgentScript unit) {
+    }
+    public virtual void RewardAtEpisodeEnds(UnitInspect inspector, GameSystem sys) {
+    }
+}
 public class DebugInfo{
 	private UnitInspect i;
 	public float initialLives, currentLives, defaultDammage, range, totalDamage, preReward=-1;

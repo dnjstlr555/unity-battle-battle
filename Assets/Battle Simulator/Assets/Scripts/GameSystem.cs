@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using UnityEngine.AI;
 using UnityEngine.SceneManagement;
+using System.Collections.Concurrent;
 
 //troop class so we can build different troops/characters
 [System.Serializable]
@@ -59,6 +60,10 @@ public class GameSystem : MonoBehaviour {
 	private int selected;
 	private GameObject currentDemoCharacter;
 	private int rotation = -90;
+	///<summary>
+	///Indicates whether the battle started or not. True If battle started<br/>
+	///If it false, Academy_Update() of GameSystem.cs, Sticky feature(requires all units to be valid) of CamController.cs, AcademyStep() of MyAcademy.cs, CollectObservations(), AgentAction(), AgentDescisionRequest() of AgentScript.cs will be disabled.
+	///</summary>
 	[HideInInspector] public bool battleStarted;
 	[HideInInspector] public int enemyNumber, knightNumber;
 	[HideInInspector] public bool FirstWarnUseOfAttackFb=false;
@@ -66,9 +71,8 @@ public class GameSystem : MonoBehaviour {
 	[HideInInspector] public GameObject EmptyUnit;
 	[HideInInspector] public GameObject[] knightUnits;
 	[HideInInspector] public GameObject[] enemyUnits;
+	[HideInInspector] public float AllInitLives, AllDamaged;
 	private bool erasing;
-	private int coins;
-	private bool erasingUsingKey;
 	private LevelData levelData;
 	private bool characterStats;
 	private Vector3 gridCenter;
@@ -77,6 +81,8 @@ public class GameSystem : MonoBehaviour {
 	private CamController cam;
 	private DebugInfo DebugInner;
 	private MyAcademy AcademyInner;
+
+	///<summary>Initializing system varables.</summary>
 	public void Academy_Initialize() {
 		print("Initializing Game System");
 		levelData = Resources.Load("Level data") as LevelData;
@@ -109,6 +115,7 @@ public class GameSystem : MonoBehaviour {
 		DebugInner= new DebugInfo(inspector);
 		AcademyInner = FindObjectOfType<MyAcademy>();
 	}
+	///<summary>Initializes knightNumber and enemyNumber, battleStarted</summary>
 	public void Academy_Awake() {
 		knightNumber=0;
 		enemyNumber=0;
@@ -119,13 +126,14 @@ public class GameSystem : MonoBehaviour {
 		}
 		DebugInner.printReset();
 	}
+	///<summary>Spawn the agents</summary>
 	public void Academy_Start() {
 		Academy_Spawn();
 	}
 	public void Academy_Spawn() {
 		print("Spawning Agents");
 		placeAgent(new Vector3(3.0f,0.0f,-12.7f),4);
-		placeAgent(new Vector3(3.2f,0,-5.7f),4);
+		placeAgent(new Vector3(3.2f,0,-5.7f),3);
 		placeAgent(new Vector3(3.0f,0.0f,2.9f),4);
 		placeAgent(new Vector3(3.0f,0.0f,9.7f),4);
 	}
@@ -139,6 +147,7 @@ public class GameSystem : MonoBehaviour {
 			Debug.LogWarning("Couldn't spawn agent for unknown reason");
 		}
 	}
+	///<summary>set battleStarted to be True</summary>
 	public void startBattle(){
 		if(!FindObjectOfType<EnemyArmy>().IsPlaced()) {
 			print("Coudln't start battle beacuse the enemy didn't spawn");
@@ -151,7 +160,11 @@ public class GameSystem : MonoBehaviour {
 		cam.printOnPanel($"Episode:{AcademyInner.GetEpisodeCount()}");
 		StartCoroutine(battleUI());
 		battleStarted = true;
+
+		//Hardcoded rewarding algorithm, need to be adjusted
+		AllInitLives=0;
 	}
+	///<summary>Check battle started and updates units to be set dead in certain condition. also updates number and battle indicator, debug infos</summary>
 	public void Academy_Update() {
 		if(battleStarted){
 			knightNumber=0;
@@ -192,7 +205,7 @@ public class GameSystem : MonoBehaviour {
 		else if(enemyNumber == 0){
 			battleIndicator.fillAmount += Time.deltaTime * 0.5f;
 		}
-
+		/*
 		GameObject nowUnit=cam.getStickyUnit();
 		if(inspector.setScriptsFrom(nowUnit)) {
 			DebugInner.setFromUnit(nowUnit);
@@ -213,7 +226,7 @@ Enemy Num:{enemyNumber}
 Episode:{AcademyInner.GetEpisodeCount()}
 		";
 		
-
+	*/
 	}
 	
 	

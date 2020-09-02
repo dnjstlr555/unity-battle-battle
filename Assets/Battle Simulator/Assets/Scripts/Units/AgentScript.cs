@@ -4,7 +4,6 @@ using MLAgents;
 using System.Collections;
 using UnityEngine.UI; 
 using UnityEngine.AI;
-using System.Linq;
 
 //public UnitInspect class located at GameSystem.cs
 
@@ -14,10 +13,12 @@ public class AgentScript : Agent
 	public float damage;
 	public string attackTag;
 	public GameObject ragdoll;
+	public Collider[] Hitbox;
 	public AudioClip attackAudio;
 	public AudioClip runAudio;
 	public float maxStopSeconds;
 	public float VectorMagnitude = 10;
+	public float AttackRange=2f;
 	
 	[HideInInspector]
 	public NavMeshAgent agent;
@@ -25,7 +26,7 @@ public class AgentScript : Agent
 	private GameObject healthbar;
 	
 
-	[HideInInspector] public float startLives;
+	[HideInInspector] public float startLives=0;
 	private float defaultStoppingDistance;
 	private Animator animator;
 	private AudioSource source;
@@ -43,11 +44,12 @@ public class AgentScript : Agent
 	[HideInInspector] public float SpecialReward=-2;
 	[HideInInspector] public bool onceDone=false;
 	[HideInInspector] public bool needAction=false;
-	[HideInInspector] public float preReward=0;
-	[HideInInspector] public float totDamage=0;
 	[HideInInspector] public DebugInfo DebugInner;
+	[HideInInspector] public int test=0;
 	private float lastTime;
+	private bool LastAction=false;
 	public override void InitializeAgent() {
+		innerInitializeAgent();
 		sys = GameObject.FindObjectOfType<GameSystem>();
 		PlannedObs = sys.initKnightNumber + sys.initEnemyNumber;
 		source = GetComponent<AudioSource>();
@@ -57,7 +59,6 @@ public class AgentScript : Agent
 		healthbar = health.transform.Find("Healthbar").gameObject;
 		health.SetActive(false);	
 		healthbar.GetComponent<Slider>().maxValue = lives;
-		startLives = lives;
 		//get default stopping distance
 		defaultStoppingDistance = agent.stoppingDistance;
 		//if there's a dust effect, find and assign it
@@ -68,9 +69,12 @@ public class AgentScript : Agent
 		area = GameObject.FindObjectOfType<WalkArea>();
 		inspector = new UnitInspect(sys);
 		lastLives=lives;
+		startLives=lives;
 		lastTime=-maxStopSeconds;
 		inspector.cam=FindObjectOfType<CamController>();
 		DebugInner=new DebugInfo(inspector);
+	}
+	public virtual void innerInitializeAgent() {
 	}
     public override void AgentReset() {
 		print("NewEpisode");
@@ -145,9 +149,10 @@ public class AgentScript : Agent
     public override void AgentAction(float[] act, string textAction)
     {
 		needAction=false;
+		//Debug.Log($"{this.gameObject.GetInstanceID()} : {-0.03f+test*0.01f} {((test!=0)?"LOL":"")}");
 		if (!dead && !IsDone() && sys.battleStarted) {
 			float angle = act[0]*360f*Mathf.Deg2Rad;
-			float force = Mathf.Clamp(act[1], 0.1f, 1)-0.1f;
+			float force = 1f; //Mathf.Clamp(act[1], 0.1f, 1)-0.1f;
 			if(force==0f) lastTime=sys.Timer;
 			Vector3 controlSignal = new Vector3(Mathf.Cos(angle),0,Mathf.Sin(angle));
 			controlSignal.Normalize();
@@ -155,16 +160,21 @@ public class AgentScript : Agent
 
 			agent.isStopped = false;	
 			agent.destination = transform.position + controlSignal;
+
 			if(SpecialReward>=-1) {
 				SetReward(SpecialReward);
 				SpecialReward=-2;
 			}
-		} else {
-			Debug.LogWarning($"{this.GetInstanceID()}:agent remained after {((dead)?"dead":((IsDone())?"done":"battle ended"))}");
-			agent.isStopped = true;
+			InnerRewardAtStep();
+		} else if (LastAction) {
 		}
-			
+		else {
+			Debug.LogWarning($"{this.GetInstanceID()}:agent remained after {((dead)?"dead":((IsDone())?"done":"battle ended"))}");
+		}
+		test=0;
     }
+	public virtual void InnerRewardAtStep() {
+	}
 	public void AgentAlwaysUpdateInternal() {
 		//Always attack check, update health bar and minus reward when it recieves damage, also animation
 		if(!dead && !this.onceDone) {
@@ -177,44 +187,12 @@ public class AgentScript : Agent
 				healthbar.GetComponent<Slider>().value = lives;
 			}
 			if(lives != lastLives) {
-				if(lives<lastLives) {
-					//damaged
-				} else {
-					//healed
-				}
 				lastLives=lives;
 			}
-			/*
-			if(dustEffect && animator.GetBool("Attacking") == false && !dustEffect.isPlaying)
-				dustEffect.Play();
-
-			if(dustEffect && dustEffect.isPlaying && animator.GetBool("Attacking") == true)
-				dustEffect.Stop();
-				*/
 			if(agent.stoppingDistance != defaultStoppingDistance)
 				agent.stoppingDistance = defaultStoppingDistance;
 
 			bool attacking = DecideAttack(1);
-			/*
-
-			if(animator.GetBool("Attacking") && !attacking){
-				animator.SetBool("Attacking", false);
-				
-				//play the running audio
-				if(source.clip != runAudio){
-					source.clip = runAudio;
-					source.Play();
-				}
-			}
-			if(!animator.GetBool("Attacking") && attacking) {
-				animator.SetBool("Attacking", true);
-				//play the attack audio
-				if(source.clip != attackAudio){
-					source.clip = attackAudio;
-					source.Play();
-				}
-			}
-			*/
 		}
 	}
 	public virtual void AgentAlwaysUpdate() {
@@ -229,14 +207,13 @@ public class AgentScript : Agent
 		bool attacking=false;
         if(act!=null) {
             if(act>=0) {
-				//placeholder, since new gameobject makes useless game object and it slows entire game
-                float minDistance=Mathf.Infinity;
+				float minDistance=Mathf.Infinity;
 				GameObject minUnit=sys.EmptyUnit;
                 foreach(GameObject enemy in inspector.getCurrentEnemys()) {
-                    inspector.setScriptsFrom(enemy);
-                    if(!inspector.isDead()) {
+                    if(enemy==this.gameObject) continue;
+                    if(inspector.setScriptsFrom(enemy) && !inspector.isDead()) {
                         float distanceToTarget = Vector3.Distance(this.transform.localPosition, enemy.transform.localPosition);
-                        if(distanceToTarget<= agent.stoppingDistance) {
+                        if(distanceToTarget<= AttackRange) {
                             minUnit=(distanceToTarget<minDistance)?enemy:minUnit;
                             minDistance=(distanceToTarget<minDistance)?distanceToTarget:minDistance;
                         }
@@ -249,14 +226,15 @@ public class AgentScript : Agent
                     if(inspector.setScriptsFrom(minUnit)) {
                         inspector.setLives(inspector.getLives()-(Time.deltaTime * damage));
                         attacking=true;
+                        test+=1;
                         if(inspector.getLives()<0) {
                             print("Damaged opponent dead");
-							AddReward(0.5f);
+                            //inspector.printOnPanel($"{this.gameObject.GetInstanceID()}:Reward 0.5");
+                            //AddReward(0.5f);
                         }
                     } else {
                         Debug.LogError("Invalid unit targetted.");
-                    }
-                    
+                    }   
                 }
             } else {
 
@@ -277,18 +255,10 @@ public class AgentScript : Agent
 			}
 		}
 	}
-	public void DebugSetPreReward(float damage, float reward) {
-		preReward=reward;
-		totDamage=damage;
-	}
 	public virtual void die() {
-		SetReward(-1f);
-		inspector.cam.printOnPanel($"{this.gameObject.GetInstanceID()}:Reward -1");
-		Done();
 	}
-	public override void AgentOnDone() {
-		//if agent still remains after the destroying, Destroy log triggers two times more after episode ends because ending an episode triggers each agent's done function.
-		//create the ragdoll at the current position
+	public void innerDie() {
+		inspector.printOnPanel($"{this.gameObject.GetInstanceID()}:Dead");
 		try {
 			if(!dead) {
 				Instantiate(ragdoll, transform.position, transform.rotation);
@@ -296,8 +266,16 @@ public class AgentScript : Agent
 		} catch {
 			Debug.LogWarning("Error on placing deadbody. You probably unsigned the ragdoll from editor manually.");
 		}
-		inspector.removeFrom(this.gameObject);
+		LastAction=true;
 		dead=true;
+		this.agent.isStopped=true;
+		agent.enabled = false;
+		this.gameObject.transform.position=new Vector3(-999,-999,-999);
+		RequestDecision();
+		inspector.removeFrom(this.gameObject);
+	}
+	public override void AgentOnDone() {
+		//if agent still remains after the destroying, Destroy log triggers two times more after episode ends because ending an episode triggers each agent's done function.
 		Destroy(gameObject);
 		Debug.Log("Agent Done");
 	}

@@ -59,9 +59,9 @@ if __name__=="__main__":
 
             for i, agent_id in enumerate(env_info.agents):
                 all_done.update({agent_id:env_info.local_done[i]})
-                
+            print(f"{env_info.rewards} / {prev_info.rewards}")
             done = ([]==env_info.local_done) or (list(all_done.values())==[True]*len(reset_info.agents))
-            
+                
             prev_info=env_info
             step+=1
         episode+=1

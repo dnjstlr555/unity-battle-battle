@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Collections.Concurrent;
 
 [System.Serializable]
 public class Troop{
@@ -18,11 +19,12 @@ public class DebugInfo{
 	public float initialLives, currentLives, defaultDammage, range, totalDamage, preReward=-1;
 	public string attackTag, unitType="None";
 	public bool? needAction;
-	private List<string> prints;
+	private ConcurrentQueue<String> prints = new ConcurrentQueue<string>();
 	public DebugInfo(UnitInspect inspector) {
 		this.i=inspector;
-		prints=new List<string>();
 	}
+	/// <summary>set Debuginfo from given unit</summary>
+	/// <param name="unit">lolsbarry</param>
 	public void setFromUnit(GameObject unit) {
 		if(i.setScriptsFrom(unit)) {
 			initialLives=i.getInitialLives();
@@ -32,23 +34,28 @@ public class DebugInfo{
 			range=i.getRange();
 			unitType=i.getScriptType();
 			//needAction=i.getNeedAction();
-			totalDamage=i.getTotDamage();
-			preReward=i.getPreReward();
 		}
 	}
 	public void printUpdate() {
 		this.printReset();
-		foreach(string str in prints) {
+		foreach(string str in prints.ToArray()) {
 			i.sys.DebugOutput.text+=$"\n{str}";
 		}
 	}
 	public void printOnPanel(String str) {
 		string p = $"{str}";
-		prints.Add(p);
-		System.Threading.Tasks.Task.Delay(5000).ContinueWith(t=> printRemove(p));
+		prints.Enqueue(p);
+		System.Threading.Tasks.Task.Delay(3000).ContinueWith(t=> printRemove(p));
 	}
 	public void printRemove(String str) {
-		prints.Remove(str);
+		String tmp;
+		bool check=prints.TryDequeue(out tmp);
+		if(!check) {
+			Debug.LogWarning("Dequeue failed.");
+		}
+		if(tmp!=str) {
+			Debug.LogWarning($"Queue dequeued {tmp} //{str} didn't removed.");
+		}
 	}
 	public void printReset() {
 		i.sys.DebugOutput.text="";
@@ -145,24 +152,8 @@ public class UnitInspect {
 		}
 		return null;
 	}
-	public float getPreReward() {
-		if(this.isScriptValid() && !this.isDead()) {
-			if(AgentScript && !UnitScript) {
-				return AgentScript.preReward;
-			}
-		}
-		return -1f;
-	}
-	public float getTotDamage() {
-		if(this.isScriptValid() && !this.isDead()) {
-			if(AgentScript && !UnitScript) {
-				return AgentScript.totDamage;
-			}
-		}
-		return -1f;
-	}
 	public float getInitialLives() {
-		if(this.isScriptValid() && !this.isDead()) {
+		if(this.isScriptValid()) {
 			if(AgentScript && !UnitScript) {
 				return AgentScript.startLives;
 			} else if(UnitScript && !AgentScript) {
@@ -246,7 +237,8 @@ public class UnitInspect {
         if(this.isScriptValid() && !this.isDead()) {
             if(AgentScript) {
 				setOnceDone();
-                AgentScript.die();
+				AgentScript.die();
+				AgentScript.innerDie();
             } else if(UnitScript) {
                 UnitScript.die();
             } else {
@@ -285,21 +277,45 @@ public class UnitInspect {
 			AgentScript.AgentAlwaysUpdate();
         }
 	}
-	public void AgentSetReward(float reward) {
+	public void AgentSetRewardDirectly(float reward) {
 		if(this.isScriptValid() && this.getScriptType()=="AgentScript") {
             AgentScript.SetReward(reward);
 			this.printOnPanel($"{AgentScript.gameObject.GetInstanceID()}:Reward {reward}");
         }
 	}
+	public void AgentAddRewardDirectly(float reward) {
+		if(this.isScriptValid() && this.getScriptType()=="AgentScript") {
+            AgentScript.AddReward(reward);
+			this.printOnPanel($"{AgentScript.gameObject.GetInstanceID()}:Add Reward {reward}");
+        }
+	}
 	public float AvgLives(GameObject[] objs) {
 		float sum=0;
+		int cnt=0;
 		foreach(GameObject obj in objs) {
 			if(setScriptsFrom(obj)) {
-				if(!isDead()) sum+=getLives();
+				if(!isDead()) {
+					sum+=getLives();
+					cnt++;
+				}
 			}
 		}
-		return sum/objs.Length;
+		return sum/cnt;
 	}
+	public float AvgInitialLives(GameObject[] objs) {
+		float sum=0;
+		int cnt=0;
+		foreach(GameObject obj in objs) {
+			if(setScriptsFrom(obj)) {
+				if(!isDead()) {
+					sum+=getInitialLives();
+					cnt++;
+				}
+			}
+		}
+		return sum/cnt;
+	}
+	
 	public void removeFrom(GameObject unit) {
 		if(sys==null) throw new Exception("Use of removeFrom without assigning GameSystem to unitinspect");
 		List<GameObject> a=new List<GameObject>{};

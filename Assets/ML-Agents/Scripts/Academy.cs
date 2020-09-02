@@ -526,7 +526,7 @@ namespace MLAgents
         }
 
         /// <summary>
-        /// Sets the done flag to true.
+        /// Sets the done flag to true. this will set done all agents.
         /// </summary>
         public void Done()
         {
@@ -562,8 +562,8 @@ namespace MLAgents
         /// </summary>
         void ForcedFullReset()
         {
-            EnvironmentReset();
-            AgentForceReset();
+            EnvironmentReset(); //initializing enviroment itself.
+            AgentForceReset(); //initializing network things
         }
 
         /// <summary>

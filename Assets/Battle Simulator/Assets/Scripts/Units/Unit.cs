@@ -14,7 +14,9 @@ public class Unit : MonoBehaviour {
 	public GameObject ragdoll;
 	public AudioClip attackAudio;
 	public AudioClip runAudio;
+	public Collider Hitbox;
 	public float RandomRange=1;
+	public float AttackRange=2f;
 	//not visible in the inspector
 	[HideInInspector]
 	public Transform currentTarget;
@@ -41,6 +43,7 @@ public class Unit : MonoBehaviour {
 	public bool dead;
 	private UnitInspect inspector;
 	private System.Random rnd;
+	private HitboxScript HitboxComponent;
 	
 	void Start(){
 		//if this an archer or enemy, don't use the spread option
@@ -64,6 +67,7 @@ public class Unit : MonoBehaviour {
 		//set healtbar value
 		healthbar.GetComponent<Slider>().maxValue = lives;
 		startLives = lives;
+		Academy.AllInitLives+=lives;
 		//get default stopping distance
 		defaultStoppingDistance = agent.stoppingDistance;
 	
@@ -76,6 +80,7 @@ public class Unit : MonoBehaviour {
 		inspector = new UnitInspect(Academy);
 		inspector.cam=FindObjectOfType<CamController>();
 		rnd = new System.Random();
+		HitboxComponent=Hitbox.GetComponent<HitboxScript>();
 	}
 	
 	void FixedUpdate(){
@@ -91,7 +96,7 @@ public class Unit : MonoBehaviour {
 		//find closest enemy
 		//ML:relating to moves
 		
-		if(currentTarget == null && Academy.knightNumber>0)
+		if((currentTarget == null||currentTarget.GetComponent<AgentScript>().dead) && Academy.knightNumber>0)
 			currentTarget = findCurrentTarget();	
 		
 		//if character ran out of lives, it should die
@@ -107,31 +112,38 @@ public class Unit : MonoBehaviour {
 		*/
 		//randomly walk across the battlefield if there's no targets left
 		//ML:relating to moves
-		if(currentTarget == null || currentTarget.GetComponent<AgentScript>().dead){
-			currentTarget = null;
-			walkRandomly();
-		}
 		else{
-			//if there are targets, make sure to use the default stopping distance
 			if(agent.stoppingDistance != defaultStoppingDistance)
 				agent.stoppingDistance = defaultStoppingDistance;
-			if(Vector3.Distance(agent.destination,transform.position)<=agent.stoppingDistance) {
-				agent.isStopped = false;	
+			if(Vector3.Distance(agent.destination, transform.position)<=agent.stoppingDistance) {
 				int sign = rnd.Next(0, 2) * 2 - 1;
 				int sign2 = rnd.Next(0, 2) * 2 - 1;
 				agent.destination = new Vector3(currentTarget.position.x+(float)gausianRand()*RandomRange*sign, currentTarget.position.y, currentTarget.position.z+(float)gausianRand()*RandomRange*sign2);	
+				agent.isStopped = false;
 			}
-			//move the agent around and set its destination to the enemy target
-			
-		
+			foreach(GameObject unit in HitboxComponent.GetCollideObjects()) {
+				if(unit==null && !ReferenceEquals(unit, null)) {
+                        HitboxComponent.RemoveObject(unit);
+                        continue;
+				}
+				if(unit.CompareTag("Knight")) {
+					if(inspector.setScriptsFrom(unit) && !inspector.isDead()) {
+						inspector.setLives(inspector.getLives()-(Time.deltaTime * damage));
+						if(inspector.getLives()<0) HitboxComponent.RemoveObject(unit);
+					} else {
+						Debug.LogWarning("Invalid Target Triggered.");
+					}
+				}
+			}
 
+			/*
 			float minDistance=Mathf.Infinity;
 			GameObject minUnit=Academy.EmptyUnit;
 			foreach(GameObject enemy in inspector.getCurrentKnights()) {
 				inspector.setScriptsFrom(enemy);
 				if(!inspector.isDead()) {
 					float distanceToTarget = Vector3.Distance(this.transform.localPosition, enemy.transform.localPosition);
-					if(distanceToTarget<= agent.stoppingDistance) {
+					if(distanceToTarget<= AttackRange) {
 						minUnit=(distanceToTarget<minDistance)?enemy:minUnit;
 						minDistance=(distanceToTarget<minDistance)?distanceToTarget:minDistance;
 					}
@@ -155,14 +167,15 @@ public class Unit : MonoBehaviour {
 			//if its still traveling to the target, play running animation
 			if(animator.GetBool("Attacking") && Vector3.Distance(currentTarget.position, transform.position) > agent.stoppingDistance){
 				animator.SetBool("Attacking", false);
-				/*
+				
 				//play the running audio
 				if(source.clip != runAudio){
 					source.clip = runAudio;
 					source.Play();
 				}
-				*/
+				
 			}
+			*/
 		}
 		//ML:relating to moves
 	}

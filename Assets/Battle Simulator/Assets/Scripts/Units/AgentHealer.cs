@@ -19,34 +19,27 @@ public class AgentHealer : AgentScript
             if(act>=0) {
                 float minDistance=Mathf.Infinity;
 				GameObject minUnit=sys.EmptyUnit;
-                foreach(GameObject knight in inspector.getUnitsByTag(attackTag)) {
+                foreach(GameObject knight in inspector.getCurrentKnights()) {
                     if(knight==this.gameObject) continue;
-                    inspector.setScriptsFrom(knight);
-                    if(!inspector.isDead()) {
+                    if(inspector.setScriptsFrom(knight) && !inspector.isDead()) {
                         float distanceToTarget = Vector3.Distance(this.transform.localPosition, knight.transform.localPosition);
-                        if(distanceToTarget<= agent.stoppingDistance) {
+                        if(distanceToTarget<= AttackRange) {
                             minUnit=(distanceToTarget<minDistance)?knight:minUnit;
                             minDistance=(distanceToTarget<minDistance)?distanceToTarget:minDistance;
                         }
                     }
                 }
-
                 if(minUnit.CompareTag("Enemy") || minUnit.CompareTag("Knight")) {
                     Vector3 currentTargetPosition = minUnit.transform.position;
                     currentTargetPosition.y = transform.position.y;
                     transform.LookAt(currentTargetPosition);
-                    if(inspector.setScriptsFrom(minUnit) && !inspector.isDead()) {
-                        float initialLives=inspector.getInitialLives();
-                        float nowLives=inspector.getLives();
-                        totalHealed+=1-(nowLives/initialLives);
-                        inspector.setLives(nowLives+(Time.deltaTime * damage));
+                    if(inspector.setScriptsFrom(minUnit)) {
+                        inspector.setLives(inspector.getLives()+(Time.deltaTime * damage));
                         attacking=true;
                     } else {
                         Debug.LogError("Invalid unit targetted.");
-                    }
-                    
+                    }   
                 }
-                checkedNumber+=1;
             }
         }
         return attacking;

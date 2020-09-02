@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.UI;
 using System.Collections.Generic;
 using System.Collections;
 using UnityEngine.EventSystems;
@@ -36,6 +37,7 @@ public class CamController : MonoBehaviour {
     }
 	
 	void Update(){
+
 		DebugInner.printUpdate();
 		Units = new Dictionary<int, GameObject>();
 		foreach(GameObject unit in inspector.getCurrentUnits()) {
@@ -91,16 +93,14 @@ public class CamController : MonoBehaviour {
 			if(Sticky>keys.Length-1) Sticky=0;
 			if(Sticky<0) Sticky=keys.Length-1;
 			if(!Units.ContainsKey(StickyKey)) {
-				
 				StickyKey=keys[Sticky];
-				Debug.Log($"no ... {StickyKey}");
 			}
 			if(Units.ContainsKey(StickyKey)) {
 				if(inspector.setScriptsFrom(Units[StickyKey]) && !inspector.isDead()) {
 					transform.position = new Vector3(Units[StickyKey].transform.position.x,transform.position.y,Units[StickyKey].transform.position.z);
 					thatKnight=Units[StickyKey];
 				} else {
-					Debug.LogError("Undead caught while controlling cam");
+					Debug.LogWarning("Undead caught while controlling cam");
 				}
 				//print($"{Units.Length}/{Sticky}/Front:{((Sticky+1<Units.Length)?Units[Sticky+1].tag:Units[0].tag)}/Current:{Units[Sticky].tag}/Backward:{((Sticky>0)?Units[Sticky-1].tag:Units[Units.Length-1].tag)}");
 			} else {

@@ -2,53 +2,46 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+public class KnightRewardSys : Reward {
+    public override void RewardAtDie(AgentScript Unit) {
+        AddReward(-1f);
+    }
+    public override void RewardAtStep(AgentScript Unit) {
+
+    }
+}
 public class AgentKnight : AgentScript
 {
     private double totalDamaged=1;
     private double totalChecked=1;
-    private bool prevDamaged=false;
-    private float prevDamage=1;
-    private bool nowDamaged=false;
+    private KnightRewardSys rewardSys = new KnightRewardSys();
+    private HitboxScript HitboxComponent;
+    public override void InnerRewardAtStep() {
+        rewardSys.Apply(this);
+    }
+    public override void innerInitializeAgent() {
+        HitboxComponent=Hitbox[0].GetComponent<HitboxScript>();
+    }
     public override bool DecideAttack(float? act) {
-		//act will indicates special ability
 		bool attacking=false;
         totalChecked+=Time.deltaTime;
         if(act!=null) {
             if(act>=0) {
-				//placeholder, since new gameobject makes useless game object and it slows entire game
-                float minDistance=Mathf.Infinity;
-				GameObject minUnit=sys.EmptyUnit;
-                nowDamaged=false;
-                foreach(GameObject enemy in inspector.getCurrentEnemys()) {
-                    if(enemy==this.gameObject) continue;
-                    if(inspector.setScriptsFrom(enemy) && !inspector.isDead()) {
-                        float distanceToTarget = Vector3.Distance(this.transform.localPosition, enemy.transform.localPosition);
-                        if(distanceToTarget<= agent.stoppingDistance) {
-                            minUnit=(distanceToTarget<minDistance)?enemy:minUnit;
-                            minDistance=(distanceToTarget<minDistance)?distanceToTarget:minDistance;
+                foreach(GameObject unit in HitboxComponent.GetCollideObjects()) {
+                    if(unit==null && !ReferenceEquals(unit, null)) {
+                        HitboxComponent.RemoveObject(unit);
+                        continue;
+                    }
+                    if(unit.CompareTag("Enemy")) {
+                        if(inspector.setScriptsFrom(unit) && !inspector.isDead()) {
+                            inspector.setLives(inspector.getLives()-(Time.deltaTime * damage));
+                            if(inspector.getLives()<0) HitboxComponent.RemoveObject(unit);
+                            attacking=true;
+                        } else {
+                            Debug.LogWarning("Invalid Target Triggered.");
                         }
                     }
                 }
-                if(minUnit.CompareTag("Enemy") || minUnit.CompareTag("Knight")) {
-                    Vector3 currentTargetPosition = minUnit.transform.position;
-                    currentTargetPosition.y = transform.position.y;
-                    transform.LookAt(currentTargetPosition);
-                    if(inspector.setScriptsFrom(minUnit)) {
-                        inspector.setLives(inspector.getLives()-(Time.deltaTime * damage));
-                        nowDamaged=true;
-                        attacking=true;
-                        totalDamaged+=(prevDamaged)?Time.deltaTime*damage+prevDamage:Time.deltaTime*damage;
-                        if(inspector.getLives()<0) {
-                            print("Damaged opponent dead");
-                            inspector.printOnPanel($"{this.gameObject.GetInstanceID()}:Reward 0.5");
-                            AddReward(0.5f);
-                        }
-                    } else {
-                        Debug.LogError("Invalid unit targetted.");
-                    }   
-                }
-                prevDamage=(nowDamaged)?Time.deltaTime*damage*prevDamage:1;
-                prevDamaged=nowDamaged;
             } else {
 
             }
@@ -56,12 +49,8 @@ public class AgentKnight : AgentScript
         return attacking;
 	}
     public override void AgentAlwaysUpdate() {
-        DebugSetPreReward((float)totalDamaged-1, (float)(DebugInfo.Sigmoid(totalDamaged-1.8f)-0.9d));
     }
     public override void die() {
-        print($"Before dead reward:{(float)(DebugInfo.Sigmoid(totalDamaged-1.8f)-0.9d)}");
-		SetReward((float)(DebugInfo.Sigmoid(totalDamaged-1.8f)-0.9d));
-        inspector.cam.printOnPanel($"{this.gameObject.GetInstanceID()}:Reward {(float)(DebugInfo.Sigmoid(totalDamaged-1.8f)-0.9d)}");
-        Done();
+        rewardSys.RewardAtDie(this);
     }
 }

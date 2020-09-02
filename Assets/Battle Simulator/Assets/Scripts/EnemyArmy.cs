@@ -18,6 +18,7 @@ public class EnemyArmy : MonoBehaviour {
 		level = PlayerPrefs.GetInt("level");
 		inspector=new UnitInspect(characterPlacement);
 	}
+	///<summary>Spawning enemy army</summary>
 	public void Academy_Start () {
 		print("Enemy army spawning");
 		IsEnemyAllPlaced = false;
@@ -39,7 +40,7 @@ public class EnemyArmy : MonoBehaviour {
 		for(int x = 0; x < levelGridSize; x++){
 			for(int z = 0; z < levelGridSize; z++){
 				//get the 3d position and the unit for that position
-				Vector3 position = new Vector3(startPosition.x - ((float)x * sizeGrid + Random.Range(-10.0f, 10.0f)), startPosition.y, startPosition.z - ((float)z * sizeGrid + Random.Range(-10.0f, 10.0f)));
+				Vector3 position = new Vector3(startPosition.x - ((float)x * sizeGrid + Random.Range(-5.0f, 5.0f)), startPosition.y, startPosition.z - ((float)z * sizeGrid + Random.Range(-5.0f, 5.0f)));
 				GameObject unit = levelData.levels[levelIndex].units[currentPosition];
 				
 				if(unit != null){
@@ -66,6 +67,8 @@ public class EnemyArmy : MonoBehaviour {
 			//if the raycast hits a terrain, spawn a unit at the hit point
 			GameObject newUnit = Instantiate(unit, hit.point, Quaternion.Euler(0, 90, 0));
 			inspector.addFrom(newUnit);
+		} else {
+			Debug.LogWarning("Couldn't spawn enemy");
 		}
 	}
 	public void initEnemies(){

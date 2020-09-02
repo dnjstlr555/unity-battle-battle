@@ -34,17 +34,11 @@ public class MyAcademy : Academy
         onceInStep=false;
     }
     void EndEpisode() {
-        Debug.Log(((sys.knightNumber<=0)?"Knight Eliminated ":"Knight Win ")+inspector.AvgLives(inspector.getCurrentKnights()).ToString()+" "+inspector.AvgLives(inspector.getCurrentEnemys()).ToString());
-        inspector.printOnPanel($"Knight {((inspector.getCurrentKnights().Length<=0)?"Lose":"Win")}");
         sys.battleStarted=false;
         System.Array.Resize(ref sys.knightUnits,0);
         System.Array.Resize(ref sys.enemyUnits,0);
         foreach(GameObject unit in inspector.getInstantiatedUnits()) {
-            if(inspector.setScriptsFrom(unit) && inspector.getScriptType()=="Unit") {
-                Destroy(unit);
-            } else if(inspector.getScriptType()=="AgentScript") {
-                Debug.LogError("An agent remained after episode ended");
-            }
+            Destroy(unit);
         }
         foreach(GameObject corpe in GameObject.FindGameObjectsWithTag("Ragdoll")) {
             corpe.GetComponent<DeleteParticles>().DestroyMe();
@@ -64,18 +58,25 @@ public class MyAcademy : Academy
             //Enviromental Upadte
             sys.Academy_Update();
             if((sys.knightNumber<=0 || sys.enemyNumber<=0) && !onceInStep) {
-                print("Processing battle end inside of academystep");
+                //On End
+                inspector.printOnPanel($"Knight {((inspector.getCurrentKnights().Length<=0)?"Lose":"Win")} / Knight:{inspector.AvgLives(inspector.getCurrentKnights())} / Enemy:{inspector.AvgLives(inspector.getCurrentEnemys())}");
+                float AllDamaged=(inspector.getCurrentEnemys().Length<=0)?0:inspector.AvgLives(inspector.getCurrentEnemys());
+                //Rewarding globally
+                foreach(GameObject knight in inspector.getInstantiatedKnights()) {
+                    if(inspector.setScriptsFrom(knight) && inspector.getScriptType()=="AgentScript") {
+                        inspector.AgentAddRewardDirectly(1-((AllDamaged-1.8f)/sys.AllInitLives));
+                        Debug.Log($"{AllDamaged}/{sys.AllInitLives}");
+                    }
+                }
+                //Rewarding remained agents
                 GameObject[] Remained=inspector.getCurrentUnits();
                 foreach(GameObject unit in Remained) {
                     if(inspector.setScriptsFrom(unit)) {
                         if(inspector.getScriptType()=="Unit") {
                             inspector.removeFrom(unit);
                             Destroy(unit);
-                            Debug.Log("an unit remained. destroying");
                         } else if(inspector.getScriptType()=="AgentScript") {
-                            Debug.Log("Agent Remained, rewarding");
-                            inspector.AgentSetReward(1f);
-                            inspector.AgentDone();
+                            Debug.Log("Agent Remained");
                         }
                     }
                 }

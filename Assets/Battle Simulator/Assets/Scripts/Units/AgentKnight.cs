@@ -24,7 +24,18 @@ public class AgentKnight : AgentScript
     private KnightRewardSys rewardSys = new KnightRewardSys();
     private HitboxScript HitboxComponent;
     public float AttackCooltime=1f;
-    public int AttackCount=0;
+    [HideInInspector] public int AttackCount=0;
+    public override void initplus(dynamic obj)
+    {
+        MLAgents.ResetParameters param;
+        AttackCooltime=obj.AttackCooltime;
+        param=obj.Param;
+        float plive, pcool, pdamage;
+		lives = (param.TryGetValue("DwarfHP", out plive))?plive:lives;
+		damage = (param.TryGetValue("DwarfDamage", out pdamage))?pdamage:damage;
+		AttackCooltime = (param.TryGetValue("DwarfAttackCooltime", out pcool))?pcool:AttackCooltime;
+        Debug.Log($"{lives} / {damage} / {AttackCooltime}");
+    }
     public override void InnerRewardAtStep() {
         rewardSys.RewardAtStep(this);
         rewardSys.Apply(this);

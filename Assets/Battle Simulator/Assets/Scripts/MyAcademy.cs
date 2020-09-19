@@ -10,7 +10,9 @@ public class AcademyReward : Reward {
         foreach(GameObject knight in inspector.getInstantiatedKnights()) {
             inspector.setScriptsFrom(knight);
             if(inspector.isScriptValid() && inspector.getScriptType()=="AgentScript") {
-                inspector.AgentAddRewardDirectly((1-((AllDamaged)/sys.AllInitLives))*2f);
+                BagReset();
+                AddReward((1-((AllDamaged)/sys.AllInitLives))*2f);
+                Apply(inspector.AgentScript);
             }
         }
         /*
@@ -33,26 +35,38 @@ public class MyAcademy : Academy
         //Monitor.SetActive(true);
 
         sys=FindObjectOfType<GameSystem>();
-        enemysys=FindObjectOfType<EnemyArmy>();
+        //enemysys=FindObjectOfType<EnemyArmy>();
         inspector=new UnitInspect(sys);
         inspector.cam=FindObjectOfType<CamController>();
 
         sys.Academy_Initialize();
-        enemysys.Academy_Initialize();
+        //enemysys.Academy_Initialize();
     }
     public override void AcademyReset() {
         if(once) {
             EndEpisode();
+        } else {
+            once=true;
         }
-        once=true;
         print("Resetting Academy");
         sys.Academy_Awake(); 
-        enemysys.Academy_Start();
+        //enemysys.Academy_Start();
         sys.Academy_Start();
         sys.startBattle(); //Asign knights, enemys
         onceInStep=false;
     }
     void EndEpisode() {
+        GameObject[] Remained=inspector.getCurrentUnits();
+        foreach(GameObject unit in Remained) {
+            if(inspector.setScriptsFrom(unit)) {
+                if(inspector.getScriptType()=="Unit") {
+                    inspector.removeFrom(unit);
+                    Destroy(unit);
+                } else if(inspector.getScriptType()=="AgentScript") {
+                    Debug.LogWarning("Agent Remained after episode ends");
+                }
+            }
+        }
         sys.battleStarted=false;
         System.Array.Resize(ref sys.knightUnits,0);
         System.Array.Resize(ref sys.enemyUnits,0);
@@ -78,22 +92,15 @@ public class MyAcademy : Academy
             sys.Academy_Update();
             if((sys.knightNumber<=0 || sys.enemyNumber<=0) && !onceInStep) {
                 //On End
-                inspector.printOnPanel($"Knight {((inspector.getCurrentKnights().Length<=0)?"Lose":"Win")} / Knight:{inspector.AvgLives(inspector.getCurrentKnights())} / Enemy:{inspector.AvgLives(inspector.getCurrentEnemys())}");
                 rewardSys.RewardAtEpisodeEnds(inspector, sys);
-                GameObject[] Remained=inspector.getCurrentUnits();
-                foreach(GameObject unit in Remained) {
-                    if(inspector.setScriptsFrom(unit)) {
-                        if(inspector.getScriptType()=="Unit") {
-                            inspector.removeFrom(unit);
-                            Destroy(unit);
-                        } else if(inspector.getScriptType()=="AgentScript") {
-                            Debug.Log("Agent Remained");
-                        }
-                    }
-                }
                 onceInStep=true;
                 Done();
             }
+        } else if(IsDone()) {
+            int knightlen = inspector.getCurrentKnights().Length;
+            int enemylen = inspector.getCurrentEnemys().Length;
+            string endstring = (knightlen>0 && enemylen<=0)?"Knight win":(enemylen>0 && knightlen<=0)?"Enemy win":(enemylen<=0 && knightlen<=0)?"Draw":(enemylen>0 && knightlen>0)?"Step Max reached":"Unknown state";
+            Debug.Log($"{endstring} KnightAvgHP:{inspector.AvgLives(inspector.getCurrentKnights())} / EnemyAvgHP:{inspector.AvgLives(inspector.getCurrentEnemys())}");
         }
     }
 }

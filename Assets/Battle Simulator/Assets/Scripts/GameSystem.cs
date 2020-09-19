@@ -1,11 +1,13 @@
 ﻿using System.Collections;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using UnityEngine.AI;
 using UnityEngine.SceneManagement;
-using System.Collections.Concurrent;
+using System.Reflection;
+using System.Dynamic;
 
 //troop class so we can build different troops/characters
 [System.Serializable]
@@ -31,7 +33,6 @@ public class GameSystem : MonoBehaviour {
 	[Space(5)]
 	public Image statsButton;
 	public Image topDownButton;
-	public Image battleIndicator;
 	
 	[Space(5)]
 	public Text statsName;
@@ -41,8 +42,6 @@ public class GameSystem : MonoBehaviour {
 	public Text statsSpeed;
 	public Text coinsText;
 	public Text levelInfo;
-	public Text infoPanel;
-	public Text DebugOutput;
 	
 	[Space(5)]
 	public Dropdown speedSetting;
@@ -53,6 +52,7 @@ public class GameSystem : MonoBehaviour {
 
 	[Header("Troops:")]
 	public List<Troop> troops;
+	public List<GameObject> enemyTroops;
 	public MLAgents.Brain brain;
 
 	private int selected;
@@ -73,13 +73,18 @@ public class GameSystem : MonoBehaviour {
 	private bool erasing;
 	private LevelData levelData;
 	private bool characterStats;
+	[HideInInspector] public bool showeffects=false;
+	[HideInInspector] public bool showhp=true;
+	[HideInInspector] public bool showanim=false;
 	private Vector3 gridCenter;
 	private int gridSize;
 	private UnitInspect inspector;
 	private CamController cam;
 	private DebugInfo DebugInner;
 	private MyAcademy AcademyInner;
-
+	private System.Random rnd = new System.Random();
+	private WalkArea area;
+	private List<Bounds> boundsLibrary;
 	///<summary>Initializing system varables.</summary>
 	public void Academy_Initialize() {
 		print("Initializing Game System");
@@ -112,53 +117,145 @@ public class GameSystem : MonoBehaviour {
 		inspector.cam=cam;
 		DebugInner= new DebugInfo(inspector);
 		AcademyInner = FindObjectOfType<MyAcademy>();
+		area=FindObjectOfType<WalkArea>();
 	}
 	///<summary>Initializes knightNumber and enemyNumber, battleStarted</summary>
 	public void Academy_Awake() {
 		knightNumber=0;
 		enemyNumber=0;
 		battleStarted=false;
+		float temp;
+		showeffects=false;
+		if(AcademyInner.resetParameters.TryGetValue("ShowEffects", out temp)) {
+			showeffects=(temp>0);
+		}
+		if(AcademyInner.resetParameters.TryGetValue("MaxStep", out temp)) {
+			if(temp>1) AcademyInner.maxSteps=Mathf.FloorToInt(temp);
+			else Debug.LogWarning("Lower than 1 step settings will be ignored");
+		}
+		if(AcademyInner.resetParameters.TryGetValue("TimeScale", out temp)) {
+			if(temp>1) AcademyInner.trainingConfiguration.timeScale=Mathf.FloorToInt(temp);
+			else Debug.LogWarning("Lower than 1 time settings will be ignored");
+		}
+		if(AcademyInner.resetParameters.TryGetValue("ShowHPBar", out temp)) {
+			showhp=(temp>0);
+		}
+		if(AcademyInner.resetParameters.TryGetValue("EnableAnimation", out temp)) {
+			showanim=(temp>0);
+		}
 		print($"after awake:{knightUnits.Length}/{enemyUnits.Length}");
 		foreach(GameObject d in enemyUnits) {
 			print(d);
 		}
-		DebugInner.printReset();
 	}
 	///<summary>Spawn the agents</summary>
 	public void Academy_Start() {
+		//Academy_EnemySpawn();
 		Academy_Spawn();
+	}
+	public void Academy_EnemySpawn() {
+		foreach(GameObject enemy in levelData.levels[0].units) {
+			if(inspector.setScriptsFrom(enemy)) {
+				placeEnemy(enemy);
+			}
+		}
 	}
 	public void Academy_Spawn() {
 		print("Spawning Agents");
+		boundsLibrary = new List<Bounds>();
+		float knightHealers, knightDwarfs, enemys;
+		knightHealers = knightDwarfs = enemys = 0;
+		if(!AcademyInner.resetParameters.TryGetValue("knightDwarfs", out knightDwarfs)) {
+			Debug.LogWarning("Reset Parameter Failed");
+		}
+		if(!AcademyInner.resetParameters.TryGetValue("knightHealers", out knightHealers)) {
+			Debug.LogWarning("Reset Parameter Failed");
+		}
+		if(!AcademyInner.resetParameters.TryGetValue("enemys", out enemys)) {
+			Debug.LogWarning("Reset Parameter Failed");
+		}
+		for(int i=0;i<knightHealers;i++) {
+			placeAgent(3);
+		}
+		for(int i=0;i<knightDwarfs;i++) {
+			placeAgent(4);
+		}
+		for(int i=0;i<enemys;i++) {
+			placeEnemy(enemyTroops[1]);
+		}
 		//placeAgent(new Vector3(3.0f,0.0f,-12.7f),4);
-		//placeAgent(new Vector3(3.2f,0,-5.7f),4);
-		placeAgent(new Vector3(3.0f,0.0f,2.9f),4);
-		//placeAgent(new Vector3(3.0f,0.0f,9.7f),4);
 	}
-	public void placeAgent(Vector3 position, int select) {
-		if(canPlace(position, false)){
-			GameObject AgentObj = Instantiate(troops[select].deployableTroops, position, Quaternion.identity);
-			AgentScript unit = AgentObj.GetComponent<AgentScript>();
-			updateRotation(unit.gameObject);
-			inspector.addFrom(AgentObj);
-		} else {
-			Debug.LogWarning("Couldn't spawn agent for unknown reason");
+	public bool placeUnit(Vector3 center, Vector3 size, GameObject unit) {
+		bool isInstantiated=false;
+		RaycastHit hit;
+		Vector3 pos=area.getRandomPosition(center, size);
+		int maxattempt=10;
+		for(int i=0;i<maxattempt;i++) {
+			if(Physics.Raycast(pos, -Vector3.up, out hit)){
+				if(hit.collider.gameObject.CompareTag("Battle ground")) {
+					//if the raycast hits a terrain, spawn a unit at the hit point
+					GameObject newUnit = Instantiate(unit, hit.point, Quaternion.identity);
+					updateRotation(newUnit);
+					newUnit.SetActive(false);
+					inspector.addFrom(newUnit);
+					isInstantiated=true;
+					break;
+				} else {
+					Debug.LogWarning($"{i} attempted SAFECHECK {unit.tag} {unit.name} didn't spawn / {pos} -> {hit.collider.gameObject.tag} {hit.collider.gameObject.name}");
+					pos=area.getRandomPosition(center, size);
+				}
+			} else {
+				Debug.LogWarning($"{i} attempted SAFECHECK {unit.tag} {unit.name} didn't spawn {pos} -> didn't collide anything (out of boundary)");
+				pos=area.getRandomPosition(center, size);
+			}
+		}
+		if(!isInstantiated) {
+			Debug.LogError($"Couldn't instantiated agent after {maxattempt} attempt -> {unit.tag} {unit.name}");
+		}
+		return isInstantiated;
+	}
+	public void placeAgent(int select) {
+		if(!placeUnit(area.KnightCenter, area.KnightArea, troops[select].deployableTroops)) {
+			Debug.LogError("Placing agent failed");
+		}
+	}
+	public void placeEnemy(GameObject unit) {
+		if(!placeUnit(area.EnemyCenter, area.EnemyArea, unit)) {
+			Debug.LogError("Placing enemy failed");
 		}
 	}
 	///<summary>set battleStarted to be True</summary>
 	public void startBattle(){
-		if(!FindObjectOfType<EnemyArmy>().IsPlaced()) {
-			print("Coudln't start battle beacuse the enemy didn't spawn");
-			return;
+		AgentPreset preset;
+		initEnemyNumber=inspector.getCurrentEnemys().Length;
+		initKnightNumber=inspector.getCurrentKnights().Length;
+		int numberOfSpace=inspector.getCurrentUnits().Length*2;
+		foreach(GameObject unit in inspector.getCurrentUnits()) {
+			if(unit.TryGetComponent<AgentPreset>(out preset)) {
+				if(preset.AgentType=="Unit") {
+					dynamic obj = preset.refer(numberOfSpace, AcademyInner.resetParameters);
+					unit.SetActive(true);
+					unit.SendMessage("initRefer", obj, SendMessageOptions.RequireReceiver);
+				} else {
+					Type anytype = Type.GetType(preset.AgentType);
+					if(anytype!=null) {
+						Component script = unit.AddComponent(anytype);
+						dynamic obj = preset.refer(numberOfSpace, AcademyInner.resetParameters);
+						Debug.Log($"{anytype.Name} / {script.name} / {obj}");
+						unit.SetActive(true);
+						script.SendMessage("initRefer", obj, SendMessageOptions.RequireReceiver);
+					} else {
+						Debug.LogError("There was invalid Agent type string which couldn't converted to type object ");
+					}
+				}
+			}
 		}
-		//knightUnits=GameObject.FindGameObjectsWithTag("Knight");
-		//enemyUnits=GameObject.FindGameObjectsWithTag("Enemy");
+
 		print($"Start:{knightUnits.Length}/{enemyUnits.Length}");
 		//show the new UI
-		cam.printOnPanel($"Episode:{AcademyInner.GetEpisodeCount()}");
+		cam.onStart();
 		StartCoroutine(battleUI());
 		battleStarted = true;
-
 		//Hardcoded rewarding algorithm, need to be adjusted
 		AllInitLives=0;
 	}
@@ -180,28 +277,6 @@ public class GameSystem : MonoBehaviour {
 					enemyNumber+=(inspector.getTag()=="Enemy")?1:0;
 				}
 			}
-			//get the current battle status to show in the indicator
-			float fill = BattleStatus();
-			
-			//change the indicator fill based on the status
-			if(battleIndicator.fillAmount < fill){
-				battleIndicator.fillAmount += Time.deltaTime * 0.1f;
-				
-				if(battleIndicator.fillAmount >= fill)
-					battleIndicator.fillAmount = fill;
-			}
-			else if(battleIndicator.fillAmount > fill){
-				battleIndicator.fillAmount -= Time.deltaTime * 0.1f;
-				
-				if(battleIndicator.fillAmount <= fill)
-					battleIndicator.fillAmount = fill;
-			}
-		}
-		else if(knightNumber == 0){
-			battleIndicator.fillAmount -= Time.deltaTime * 0.5f;
-		}
-		else if(enemyNumber == 0){
-			battleIndicator.fillAmount += Time.deltaTime * 0.5f;
 		}
 		/*
 		GameObject nowUnit=cam.getStickyUnit();
@@ -250,6 +325,7 @@ Episode:{AcademyInner.GetEpisodeCount()}
 		
 		return (float)knightsLeft/(float)total;
 	}
+	
 	
 	//place a new unit
 	

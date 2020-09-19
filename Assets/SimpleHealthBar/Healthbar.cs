@@ -43,6 +43,8 @@ public class Healthbar : MonoBehaviour {
     public Color mediumHealthColor = new Color(0.9450285f, 1f, 0.4481132f);
     public Color lowHealthColor = new Color(1f, 0.259434f, 0.259434f);
 
+    public Color[] UnitColor;
+    public Color[] KnightColor;
     public Text description;
     private void Start()
     {
@@ -63,7 +65,7 @@ public class Healthbar : MonoBehaviour {
     // Every frame:
     private void Update()
     {
-        healthPercentage = int.Parse((Mathf.Round(100f * (health / maximumHealth))).ToString());
+        healthPercentage = (int)(Mathf.Round(100f * (health / maximumHealth)));
 
         // If the player's health is below the minimum health, then set it to the minimum health:
         if (health < minimumHealth)
@@ -140,5 +142,18 @@ public class Healthbar : MonoBehaviour {
     }
     public void SetDesc(string str) {
         description.text=str;
+        
+    }
+    public void SetColorTag(string tag) {
+        if(tag=="Knight") {
+            highHealthColor=UnitColor[0];
+            mediumHealthColor=UnitColor[1];
+            lowHealthColor=UnitColor[2];
+        } else if(tag=="Enemy") {
+            highHealthColor=KnightColor[0];
+            mediumHealthColor=KnightColor[1];
+            lowHealthColor=KnightColor[2];
+        }
+        //easter egg 
     }
 }

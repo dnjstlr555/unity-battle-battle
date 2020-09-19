@@ -7,8 +7,12 @@ public class DeleteParticles : MonoBehaviour {
 	public float lifetime = 1f;
 	public ParticleSystem DeadParticle;
 	void Start(){
-		DeadParticle.Play();
-		Invoke("DestroyMe", lifetime);
+		if(FindObjectOfType<GameSystem>().showeffects) {
+			DeadParticle.Play();
+			Invoke("DestroyMe", lifetime);
+		} else {
+			Destroy(this.gameObject);
+		}
 	}
 	/*
 	void Update() {

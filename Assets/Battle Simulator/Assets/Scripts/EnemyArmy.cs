@@ -10,6 +10,7 @@ public class EnemyArmy : MonoBehaviour {
 	private GameSystem characterPlacement;
 	private int level;
 	private UnitInspect inspector;
+	private System.Random rnd = new System.Random();
 	public void Academy_Initialize() {
 		print("Initializing Enemy System");
 		characterPlacement = GameObject.FindObjectOfType<GameSystem>();
@@ -61,14 +62,28 @@ public class EnemyArmy : MonoBehaviour {
 	//spawn a new enemy
 	public void spawnNew(Vector3 position, GameObject unit){
 		//store the raycast hit
+		Vector3 pos=position;
 		RaycastHit hit;
-		
-		if(Physics.Raycast(position, -Vector3.up, out hit)){
-			//if the raycast hits a terrain, spawn a unit at the hit point
-			GameObject newUnit = Instantiate(unit, hit.point, Quaternion.Euler(0, 90, 0));
-			inspector.addFrom(newUnit);
-		} else {
-			Debug.LogWarning("Couldn't spawn enemy");
+		bool isInstantiated=false;
+		for(int i=0;i<6;i++) {
+			if(Physics.Raycast(pos, -Vector3.up, out hit)){
+				Debug.Log($"Spawn Point:{hit.point}/{hit.collider.gameObject.tag}");
+				if(hit.collider.gameObject.CompareTag("Battle ground")) {
+					//if the raycast hits a terrain, spawn a unit at the hit point
+					GameObject newUnit = Instantiate(unit, hit.point, Quaternion.Euler(0, 90, 0));
+					inspector.addFrom(newUnit);
+					isInstantiated=true;
+					break;
+				} else {
+					int sign = rnd.Next(0, 2) * 2 - 1;
+					int sign2 = rnd.Next(0, 2) * 2 - 1;
+					pos.x+=2.4f*sign;
+					pos.z+=2.4f*sign2;
+				}
+			}
+		}
+		if(!isInstantiated) {
+			Debug.LogError("Couldn't instantiated enemy");
 		}
 	}
 	public void initEnemies(){

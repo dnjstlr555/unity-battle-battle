@@ -11,7 +11,9 @@ public class CamController : MonoBehaviour {
 	public static float zoomSpeed=1000f;
 	public static float mouseSensitivity=120f;
     public static float clampAngle=70f;
-	public Healthbar[] HpBar;
+	public GameObject HpBar;
+	public Transform HpBarParent;
+	private Dictionary<GameObject, Healthbar> Dict;
     private float rotationY = 0;
     private float rotationX = 0;
 	
@@ -35,14 +37,42 @@ public class CamController : MonoBehaviour {
 		inspector = new UnitInspect(characterPlacer);
 		DebugInner = new DebugInfo(inspector);
     }
+	public void onStart() {
+		if(Dict!=null) {
+			foreach(Healthbar pair in Dict.Values) {
+				Destroy(pair.gameObject);
+			}
+		}
+		Dict=new Dictionary<GameObject, Healthbar>();
+		if(characterPlacer.showhp) {
+			GameObject[] units=inspector.getCurrentUnits();
+			for(int i=1;i<=units.Length;i++) {
+				if(inspector.setScriptsFrom(units[i-1])) {
+					GameObject obj = Instantiate(HpBar);
+					Healthbar bar = obj.GetComponent<Healthbar>();
+					bar.SetDesc(inspector.getScriptType());
+					bar.SetColorTag(units[i-1].tag);
+					bar.maximumHealth=inspector.getInitialLives();
+					obj.transform.SetParent(HpBarParent);
+					obj.transform.localPosition=new Vector3(87,i*(-34)-38,30);
+					obj.transform.localScale=new Vector3(1f,0.2f,0.2f);
+					Dict.Add(units[i-1], bar);
+				}
+			}
+		}
+		
+	}
+	void onUpdate(GameObject obj, Healthbar bar) {
+		if(inspector.setScriptsFrom(obj)) {
+			bar.SetHealth(inspector.getLives());
+		}
+	}
 	void Update(){
-		inspector.setScriptsFrom(inspector.getCurrentUnits()[0]);
-		HpBar[0].SetHealth(inspector.getLives());
-		HpBar[0].SetDesc(inspector.getScriptType());
-		inspector.setScriptsFrom(inspector.getCurrentUnits()[1]);
-		HpBar[1].SetHealth(inspector.getLives());
-		HpBar[1].SetDesc(inspector.getScriptType());
-		DebugInner.printUpdate();
+		if(Dict!=null && characterPlacer.showhp) {
+			foreach(KeyValuePair<GameObject, Healthbar> pair in Dict) {
+				onUpdate(pair.Key, pair.Value);
+			}
+		}
 		Units = new Dictionary<int, GameObject>();
 		foreach(GameObject unit in inspector.getCurrentUnits()) {
 			Units.Add(unit.GetInstanceID(), unit);
@@ -115,9 +145,6 @@ public class CamController : MonoBehaviour {
 	}	
 	public GameObject getStickyUnit() {
 		return thatKnight;
-	}
-	public void printOnPanel(string str) {
-		DebugInner.printOnPanel(str);
 	}
 	void rotateCamera(float mouseX, float mouseY){
 		rotationY += mouseX * mouseSensitivity * timescale;

@@ -60,30 +60,6 @@ public class DebugInfo{
 			//needAction=i.getNeedAction();
 		}
 	}
-	public void printUpdate() {
-		this.printReset();
-		foreach(string str in prints.ToArray()) {
-			i.sys.DebugOutput.text+=$"\n{str}";
-		}
-	}
-	public void printOnPanel(String str) {
-		string p = $"{str}";
-		prints.Enqueue(p);
-		System.Threading.Tasks.Task.Delay(3000).ContinueWith(t=> printRemove(p));
-	}
-	public void printRemove(String str) {
-		String tmp;
-		bool check=prints.TryDequeue(out tmp);
-		if(!check) {
-			Debug.LogWarning("Dequeue failed.");
-		}
-		if(tmp!=str) {
-			Debug.LogWarning($"Queue dequeued {tmp} //{str} didn't removed.");
-		}
-	}
-	public void printReset() {
-		i.sys.DebugOutput.text="";
-	}
 	public static double Sigmoid(double value) {
 		double k = Exp(value);
 		return k / (1.0f + k);
@@ -178,13 +154,32 @@ public class UnitInspect {
 	}
 	public float getInitialLives() {
 		if(this.isScriptValid()) {
-			if(AgentScript && !UnitScript) {
-				return AgentScript.startLives;
-			} else if(UnitScript && !AgentScript) {
-				return UnitScript.startLives;
+			if(getInitPassed()) {
+				if(AgentScript && !UnitScript) {
+					return AgentScript.startLives;
+				} else if(UnitScript && !AgentScript) {
+					return UnitScript.startLives;
+				}
+			} else {
+				if(AgentScript && !UnitScript) {
+					return AgentScript.lives;
+				} else if(UnitScript && !AgentScript) {
+					return UnitScript.lives;
+				}
 			}
+			
 		}
 		return -1;
+	}
+	public bool getInitPassed() {
+		if(this.isScriptValid()) {
+			if(AgentScript && !UnitScript) {
+				return AgentScript.isPassedInit;
+			} else if(UnitScript && !AgentScript) {
+				return UnitScript.isPassedInit;
+			}
+		}
+		return false;
 	}
     public GameObject[] getCurrentUnits() {
 		GameObject[] k = getCurrentKnights();
@@ -304,13 +299,11 @@ public class UnitInspect {
 	public void AgentSetRewardDirectly(float reward) {
 		if(this.isScriptValid() && this.getScriptType()=="AgentScript") {
             AgentScript.SetReward(reward);
-			this.printOnPanel($"{AgentScript.gameObject.GetInstanceID()}:Reward {reward}");
         }
 	}
 	public void AgentAddRewardDirectly(float reward) {
 		if(this.isScriptValid() && this.getScriptType()=="AgentScript") {
             AgentScript.AddReward(reward);
-			this.printOnPanel($"{AgentScript.gameObject.GetInstanceID()}:Add Reward {reward}");
         }
 	}
 	public float AvgLives(GameObject[] objs) {
@@ -324,7 +317,7 @@ public class UnitInspect {
 				}
 			}
 		}
-		return sum/cnt;
+		return (cnt>0)?(float)Math.Round(sum/cnt,3):0;
 	}
 	public float AvgInitialLives(GameObject[] objs) {
 		float sum=0;
@@ -369,8 +362,5 @@ public class UnitInspect {
 		a.Add(unit);
 		sys.knightUnits=(unit.tag=="Knight")?a.ToArray():sys.knightUnits;
 		sys.enemyUnits=(unit.tag=="Enemy")?a.ToArray():sys.enemyUnits;
-	}
-	public void printOnPanel(string str) {
-		cam.printOnPanel(str);
 	}
 }

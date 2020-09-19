@@ -325,7 +325,7 @@ namespace MLAgents
 
         /// Monobehavior function that is called when the attached GameObject
         /// becomes enabled or active.
-        void OnEnable()
+        void Start()
         {
             var textureCount = agentParameters.agentCameras.Count+agentParameters.agentRenderTextures.Count;
             textureArray = new Texture2D[textureCount];
@@ -341,7 +341,7 @@ namespace MLAgents
             recorder = GetComponent<DemonstrationRecorder>();
         }
 
-        /// Helper method for the <see cref="OnEnable"/> event, created to
+        /// Helper method for the <see cref="Start"/> event, created to
         /// facilitate testing.
         void OnEnableHelper(Academy academy)
         {

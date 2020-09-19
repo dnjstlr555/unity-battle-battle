@@ -116,18 +116,18 @@ namespace MLAgents
                  "values correspond to episodes without a maximum number of \n" +
                  "steps. Once the step counter reaches this maximum value, the " +
                  "environment will reset.")]
-        int maxSteps;
+        public int maxSteps;
 
         [SerializeField]
         [Tooltip("The engine-level settings which correspond to rendering " +
                  "quality and engine speed during Training.")]
-        EnvironmentConfiguration trainingConfiguration =
+        public EnvironmentConfiguration trainingConfiguration =
             new EnvironmentConfiguration(80, 80, 1, 100.0f, -1);
 
         [SerializeField]
         [Tooltip("The engine-level settings which correspond to rendering " +
                  "quality and engine speed during Inference.")]
-        EnvironmentConfiguration inferenceConfiguration =
+        public EnvironmentConfiguration inferenceConfiguration =
             new EnvironmentConfiguration(1280, 720, 5, 1.0f, 60);
 
         /// <summary>

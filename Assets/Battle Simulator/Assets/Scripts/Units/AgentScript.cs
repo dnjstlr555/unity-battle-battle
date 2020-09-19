@@ -4,7 +4,7 @@ using MLAgents;
 using System.Collections;
 using UnityEngine.UI; 
 using UnityEngine.AI;
-
+using System.Dynamic;
 public class AgentReward : Reward {
 	//Example, not working
 	public override void RewardAtDie(AgentScript Unit) {
@@ -24,7 +24,7 @@ public class AgentScript : Agent
 	public float maxStopSeconds;
 	public float VectorMagnitude = 10;
 	//public float AttackCooltime=3f;
-	public float Deprecated_AttackRange=2f;
+	public float DeprecatedAttackRange=2f;
 	public ParticleSystem DamagedParticle;
 	public ParticleSystem HealedParticle;
 	
@@ -52,21 +52,49 @@ public class AgentScript : Agent
 	[HideInInspector] public float SpecialReward=-2;
 	[HideInInspector] public bool onceDone=false;
 	[HideInInspector] public bool needAction=false;
+	[HideInInspector] public bool isPassedInit=false;
 	[HideInInspector] public DebugInfo DebugInner;
 	[HideInInspector] public int test=0;
 	private float lastTime;
 	private float lastAction=0;
-	public override void InitializeAgent() {
+	private void Awake() {
+		this.agentParameters = new AgentParameters();
+		this.agentParameters.onDemandDecision=true;
+		this.agentParameters.resetOnDone=false;
+		this.agentParameters.maxStep=0;
+	}
+	public void initRefer(dynamic obj) {
+		Debug.Log("Greetings from refer");
+		GiveBrain(obj.AgnetBrain);
+		lives=obj.lives;
+		damage=obj.damage;
+		attackTag=obj.attackTag;
+		ragdoll=obj.ragdoll;
+		Hitbox=obj.Hitbox;
+		attackAudio=obj.attackAudio;
+		runAudio=obj.runAudio;
+		maxStopSeconds=obj.maxStopSeconds;
+		VectorMagnitude=obj.VectorMagnitude;
+		DeprecatedAttackRange=obj.DeprecatedAttackRange;
+		DamagedParticle=obj.DamagedParticle;
+		HealedParticle=obj.HealedParticle;
+		float mag;
+		VectorMagnitude=(obj.Param.TryGetValue("AngularMoveMagnitude", out mag))?mag:VectorMagnitude;
+		Debug.Log("Set parameters passed");
+		initplus(obj);
 		innerInitializeAgent();
+
 		sys = GameObject.FindObjectOfType<GameSystem>();
 		PlannedObs = sys.initKnightNumber + sys.initEnemyNumber;
 		source = GetComponent<AudioSource>();
 		agent = this.GetComponent<NavMeshAgent>();
 		animator = this.GetComponent<Animator>();
+		/*
 		health = transform.Find("Health").gameObject;
 		healthbar = health.transform.Find("Healthbar").gameObject;
 		health.SetActive(false);	
 		healthbar.GetComponent<Slider>().maxValue = lives;
+		*/
 		//get default stopping distance
 		defaultStoppingDistance = agent.stoppingDistance;
 		//if there's a dust effect, find and assign it
@@ -81,6 +109,12 @@ public class AgentScript : Agent
 		lastTime=-maxStopSeconds;
 		inspector.cam=FindObjectOfType<CamController>();
 		DebugInner=new DebugInfo(inspector);
+		isPassedInit=true;
+	}
+	public virtual void initplus(dynamic obj) {
+	}
+	public override void InitializeAgent() {
+		if(!sys.showanim) animator.enabled=false;
 	}
 	public virtual void innerInitializeAgent() {
 	}
@@ -118,7 +152,7 @@ public class AgentScript : Agent
 						continue;
 					}
 					//When script is not valid but it existed as game object
-					Debug.LogError("Unknown game object tagged as knight and it observated.");
+					Debug.LogWarning("Unknown game object tagged as knight and it observated.");
 					AddVectorObs(0);
 					AddVectorObs(0);
 					continue;
@@ -188,6 +222,7 @@ public class AgentScript : Agent
 	public void AgentAlwaysUpdateInternal() {
 		//Always attack check, update health bar and minus reward when it recieves damage, also animation
 		if(!dead && !this.onceDone) {
+			/*
 			if(lives != startLives){
 				//only use the healthbar when the character lost some lives
 				if(!health.activeSelf)
@@ -196,21 +231,27 @@ public class AgentScript : Agent
 				health.transform.LookAt(2 * transform.position - Camera.main.transform.position);
 				healthbar.GetComponent<Slider>().value = lives;
 			}
+			*/
 			if(lives != lastLives) {
-				if(!DamagedParticle.isPlaying) {
-					DamagedParticle.Play();
-					//DamagedParticle.Simulate(Time.unscaledDeltaTime, true, false);
+				if(lives<lastLives) {
+					if(!DamagedParticle.isPlaying && sys.showeffects) {
+						DamagedParticle.Play();
+						//DamagedParticle.Simulate(Time.unscaledDeltaTime, true, false);
+					}
 				}
 				lastLives=lives;
 			}
+			if(lives>startLives) lives=startLives;
 			if(agent.stoppingDistance != defaultStoppingDistance)
 				agent.stoppingDistance = defaultStoppingDistance;
 
 			bool attacking = DecideAttack(lastAction);
-			if(attacking) {
-				animator.SetBool("Attacking", true);
-			} else if(animator.GetBool("Attacking")) {
-				animator.SetBool("Attacking", false);
+			if(sys.showanim) {
+				if(attacking) {
+					animator.SetBool("Attacking", true);
+				} else if(animator.GetBool("Attacking")) {
+					animator.SetBool("Attacking", false);
+				}
 			}
 		}
 	}
@@ -232,7 +273,7 @@ public class AgentScript : Agent
                     if(enemy==this.gameObject) continue;
                     if(inspector.setScriptsFrom(enemy) && !inspector.isDead()) {
                         float distanceToTarget = Vector3.Distance(this.transform.localPosition, enemy.transform.localPosition);
-                        if(distanceToTarget<= Deprecated_AttackRange) {
+                        if(distanceToTarget<= DeprecatedAttackRange) {
                             minUnit=(distanceToTarget<minDistance)?enemy:minUnit;
                             minDistance=(distanceToTarget<minDistance)?distanceToTarget:minDistance;
                         }
@@ -277,7 +318,6 @@ public class AgentScript : Agent
 	public virtual void die() {
 	}
 	public void innerDie() {
-		inspector.printOnPanel($"{this.gameObject.GetInstanceID()}:Dead");
 		try {
 			if(!dead) {
 				Instantiate(ragdoll, transform.position, transform.rotation);

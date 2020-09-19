@@ -17,6 +17,7 @@ public class Unit : MonoBehaviour {
 	public Collider Hitbox;
 	public float RandomRange=1;
 	public float AttackRange=2f;
+	public float AttackCooltime=1f;
 	public ParticleSystem DamagedParticle;
 	//not visible in the inspector
 	[HideInInspector]
@@ -30,6 +31,7 @@ public class Unit : MonoBehaviour {
 	private GameObject healthbar;
 	
 	[HideInInspector] public float startLives;
+	[HideInInspector] public bool isPassedInit=false;
 	private float defaultStoppingDistance;
 	private Animator animator;
 	private AudioSource source;
@@ -46,7 +48,14 @@ public class Unit : MonoBehaviour {
 	private System.Random rnd;
 	private HitboxScript HitboxComponent;
 	private bool isPassedCooltime=true;
-	
+	private MLAgents.ResetParameters param;
+	public void initRefer(dynamic obj) {
+		param=obj.Param;
+		float plive, pcool, pdamage;
+		lives = (param.TryGetValue("EnemyHP", out plive))?plive:lives;
+		damage = (param.TryGetValue("EnemyDamage", out pdamage))?pdamage:damage;
+		AttackCooltime = (param.TryGetValue("EnemyAttackCooltime", out pcool))?pcool:AttackCooltime;
+	}
 	void Start(){
 		//if this an archer or enemy, don't use the spread option
 		if(GetComponent<Archer>() || this.tag == "Enemy")
@@ -60,14 +69,15 @@ public class Unit : MonoBehaviour {
 		//find navmesh agent component
 		agent = this.GetComponent<NavMeshAgent>();
 		animator = this.GetComponent<Animator>();
-	
+		/*
 		//find objects attached to this character
 		health = transform.Find("Health").gameObject;
 		healthbar = health.transform.Find("Healthbar").gameObject;
 		health.SetActive(false);	
+		*/
 		lastLives=lives;
 		//set healtbar value
-		healthbar.GetComponent<Slider>().maxValue = lives;
+		//healthbar.GetComponent<Slider>().maxValue = lives;
 		startLives = lives;
 		Academy.AllInitLives+=lives;
 		//get default stopping distance
@@ -83,18 +93,12 @@ public class Unit : MonoBehaviour {
 		inspector.cam=FindObjectOfType<CamController>();
 		rnd = new System.Random();
 		HitboxComponent=Hitbox.GetComponent<HitboxScript>();
+		isPassedInit=true;
+		if(!Academy.showanim) animator.enabled=false;
 	}
 	
 	void FixedUpdate(){
-		if(lives != startLives){
-			//only use the healthbar when the character lost some lives
-			if(!health.activeSelf)
-				health.SetActive(true);
-			
-			health.transform.LookAt(2 * transform.position - Camera.main.transform.position);
-			healthbar.GetComponent<Slider>().value = lives;
-		}
-		if(lives != lastLives) {
+		if(lives != lastLives && Academy.showeffects) {
 			if(!DamagedParticle.isPlaying) {
 				DamagedParticle.Play();
 				//DamagedParticle.Simulate(Time.unscaledDeltaTime, true, false);
@@ -104,31 +108,27 @@ public class Unit : MonoBehaviour {
 		
 		//find closest enemy
 		//ML:relating to moves
-		
-		if((currentTarget == null||currentTarget.GetComponent<AgentScript>().dead) && Academy.knightNumber>0)
-			currentTarget = findCurrentTarget();	
+		if(currentTarget!=null) {
+			inspector.setScriptsFrom(currentTarget.gameObject);
+			if(!inspector.isScriptValid() || inspector.isDead()) {
+				currentTarget = findCurrentTarget();
+			}
+		} else {
+			currentTarget = findCurrentTarget();
+		}
+			
 		
 		//if character ran out of lives, it should die
 		if(lives < 0 && !dead)
 			die();
-		/*
-		//play dusteffect when running and stop it when the character is not running
-		if(dustEffect && animator.GetBool("Attacking") == false && !dustEffect.isPlaying)
-			dustEffect.Play();
-
-		if(dustEffect && dustEffect.isPlaying && animator.GetBool("Attacking") == true)
-			dustEffect.Stop();
-		*/
-		//randomly walk across the battlefield if there's no targets left
-		//ML:relating to moves
 		else{
-			if(agent.stoppingDistance != defaultStoppingDistance)
-				agent.stoppingDistance = defaultStoppingDistance;
-			if(Vector3.Distance(agent.destination, transform.position)<=agent.stoppingDistance) {
+			if(Vector3.Distance(agent.destination, transform.position)<=agent.stoppingDistance && currentTarget!=null) {
 				int sign = rnd.Next(0, 2) * 2 - 1;
 				int sign2 = rnd.Next(0, 2) * 2 - 1;
 				agent.destination = new Vector3(currentTarget.position.x+(float)gausianRand()*RandomRange*sign, currentTarget.position.y, currentTarget.position.z+(float)gausianRand()*RandomRange*sign2);	
 				agent.isStopped = false;
+			} else if (currentTarget==null) {
+				agent.destination = getRandomPosition(area);
 			}
 			if(isPassedCooltime) { //&& (rnd.Next(0, 2) * 2 - 1)>0) {
 				foreach(GameObject unit in HitboxComponent.GetCollideObjects()) {
@@ -148,53 +148,11 @@ public class Unit : MonoBehaviour {
 				isPassedCooltime=false;
 				StartCoroutine("Cooltime");
 			}
-			
-
-			/*
-			float minDistance=Mathf.Infinity;
-			GameObject minUnit=Academy.EmptyUnit;
-			foreach(GameObject enemy in inspector.getCurrentKnights()) {
-				inspector.setScriptsFrom(enemy);
-				if(!inspector.isDead()) {
-					float distanceToTarget = Vector3.Distance(this.transform.localPosition, enemy.transform.localPosition);
-					if(distanceToTarget<= AttackRange) {
-						minUnit=(distanceToTarget<minDistance)?enemy:minUnit;
-						minDistance=(distanceToTarget<minDistance)?distanceToTarget:minDistance;
-					}
-				}
-			}
-			if(minUnit.CompareTag("Enemy") || minUnit.CompareTag("Knight")) {
-				Vector3 currentTargetPosition = minUnit.transform.position;
-				currentTargetPosition.y = transform.position.y;
-				transform.LookAt(currentTargetPosition);
-				if(inspector.setScriptsFrom(minUnit)) {
-					inspector.setLives(inspector.getLives()-(Time.deltaTime * damage));
-					animator.SetBool("Attacking", true);
-					if(inspector.getLives()<0) {
-						//print("Damaged agent dead");
-					}
-				} else {
-					Debug.LogError("Invalid unit targetted.");
-				}
-				
-			}
-			//if its still traveling to the target, play running animation
-			if(animator.GetBool("Attacking") && Vector3.Distance(currentTarget.position, transform.position) > agent.stoppingDistance){
-				animator.SetBool("Attacking", false);
-				
-				//play the running audio
-				if(source.clip != runAudio){
-					source.clip = runAudio;
-					source.Play();
-				}
-				
-			}
-			*/
 		}
 		//ML:relating to moves
 	}
 	IEnumerator Cooltime() {
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(AttackCooltime);
         isPassedCooltime=true;
     }
 	//randomly walk around
@@ -330,8 +288,8 @@ public class Unit : MonoBehaviour {
 	
 	//find a random position inside the walk area
 	public Vector3 getRandomPosition(WalkArea area){
-		Vector3 center = area.center;
-		Vector3 bounds = area.area;
+		Vector3 center = area.RandCenter;
+		Vector3 bounds = area.RandArea;
 		
 		//create a ray using the center and the bounds
 		float yRay = center.y + bounds.y/2f;
